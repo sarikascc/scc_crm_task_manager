@@ -193,7 +193,11 @@ export function Sidebar({
           {/* Navigation Menu */}
           <nav className={`flex-1 overflow-y-auto transition-all duration-300 ${isCollapsed ? 'px-2 py-4' : 'px-4 py-6'} scrollbar-hide`}>
             <ul className="space-y-2">
-              {menuItems.map((item) => {
+              {menuItems.filter(item => {
+                if (item.name === 'Users') return userRole === 'admin'
+                if (item.name === 'Settings' && userRole === 'manager') return false
+                return true
+              }).map((item) => {
                 // More precise active state: exact match or starts with the href followed by /
                 // Special handling for /dashboard to only match exactly
                 let isActive = false
@@ -217,10 +221,9 @@ export function Sidebar({
                       className={`
                         group relative flex items-center rounded-xl text-sm font-medium transition-all duration-200
                         ${isCollapsed ? 'justify-center px-2 py-3.5' : 'gap-3 px-4 py-3.5'}
-                        ${
-                          isActive
-                            ? 'bg-[#06B6D4]/10 text-[#06B6D4] shadow-sm'
-                            : 'text-[#1E1B4B] hover:bg-[#06B6D4]/5'
+                        ${isActive
+                          ? 'bg-[#06B6D4]/10 text-[#06B6D4] shadow-sm'
+                          : 'text-[#1E1B4B] hover:bg-[#06B6D4]/5'
                         }
                       `}
                     >
@@ -356,9 +359,8 @@ export function Sidebar({
                       aria-label="Toggle profile"
                     >
                       <svg
-                        className={`h-4 w-4 text-green-500 transition-transform duration-200 ${
-                          isProfileExpanded ? 'rotate-180' : ''
-                        }`}
+                        className={`h-4 w-4 text-green-500 transition-transform duration-200 ${isProfileExpanded ? 'rotate-180' : ''
+                          }`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"

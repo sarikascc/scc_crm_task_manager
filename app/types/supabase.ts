@@ -14,7 +14,8 @@ export interface Database {
           id: string
           email: string
           full_name: string | null
-          role: 'admin' | 'manager' | 'user'
+          role: 'admin' | 'manager' | 'user' | 'staff' | 'client'
+          module_permissions: Record<string, 'read' | 'write' | 'none'>
           is_active: boolean
           created_at: string
           updated_at: string
@@ -23,7 +24,8 @@ export interface Database {
           id: string
           email: string
           full_name?: string | null
-          role?: 'admin' | 'manager' | 'user'
+          role?: 'admin' | 'manager' | 'user' | 'staff' | 'client'
+          module_permissions?: Record<string, 'read' | 'write' | 'none'>
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -32,7 +34,8 @@ export interface Database {
           id?: string
           email?: string
           full_name?: string | null
-          role?: 'admin' | 'manager' | 'user'
+          role?: 'admin' | 'manager' | 'user' | 'staff' | 'client'
+          module_permissions?: Record<string, 'read' | 'write' | 'none'>
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -46,8 +49,14 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      user_role: 'admin' | 'manager' | 'user'
+      user_role: 'admin' | 'manager' | 'user' | 'staff' | 'client'
     }
   }
 }
+
+export type ModulePermission = {
+  moduleId: string
+  accessLevel: 'read' | 'write' | 'none'
+}
+
 

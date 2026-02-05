@@ -1,41 +1,48 @@
-import { requireAuth } from '@/lib/auth/utils'
+import { requireRole } from '@/lib/auth/utils'
 import { DashboardLayout } from '@/app/components/dashboard/dashboard-layout'
+import { getUsers } from '@/lib/users/actions'
+import { UsersTable } from '@/app/components/users/users-table'
+import Link from 'next/link'
 
 export default async function UsersPage() {
-  const user = await requireAuth()
+  const currentUser = await requireRole(['admin'])
+  const { data: users, error } = await getUsers()
 
   return (
     <DashboardLayout
-      pageTitle="Users"
-      userEmail={user.email}
-      userFullName={user.fullName}
-      userRole={user.role}
+      pageTitle="User Management"
+      userEmail={currentUser.email}
+      userFullName={currentUser.fullName}
+      userRole={currentUser.role}
     >
-      <div className="rounded-lg bg-white p-12 shadow-sm">
-        <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#06B6D4]/10">
-            <svg
-              className="h-8 w-8 text-[#06B6D4]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-              />
-            </svg>
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
+        <div className="sm:flex sm:items-center">
+          <div className="sm:flex-auto">
+            <h1 className="text-xl font-semibold text-gray-900">Users</h1>
+            <p className="mt-2 text-sm text-gray-700">
+              A list of all users including their name, role, and current status.
+            </p>
           </div>
-          <h2 className="mt-6 text-2xl font-semibold text-[#1E1B4B]">Coming Soon</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            The Users module is currently under development and will be available soon.
-          </p>
+          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <Link
+              href="/dashboard/users/create"
+              className="btn-gradient-smooth rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2"
+            >
+              Add User
+            </Link>
+          </div>
+        </div>
+        <div className="mt-8">
+          {error ? (
+            <div className="rounded-md bg-red-50 p-4">
+              <h3 className="text-sm font-medium text-red-800">Error loading users</h3>
+              <div className="mt-2 text-sm text-red-700">{error}</div>
+            </div>
+          ) : (
+            <UsersTable users={users || []} currentUserId={currentUser.id} />
+          )}
         </div>
       </div>
     </DashboardLayout>
   )
 }
-
-
