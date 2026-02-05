@@ -66,7 +66,7 @@ export function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F5F3FF]">
+    <div className="flex h-screen overflow-hidden bg-[var(--background)]">
       {/* Sidebar */}
       <Sidebar
         isMobileOpen={isMobileMenuOpen}

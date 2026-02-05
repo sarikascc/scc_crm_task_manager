@@ -14,8 +14,8 @@ export interface Database {
           id: string
           email: string
           full_name: string | null
-          role: 'admin' | 'manager' | 'user' | 'staff' | 'client'
-          module_permissions: Record<string, 'read' | 'write' | 'none'>
+          role: 'admin' | 'manager' | 'staff' | 'client'
+          module_permissions: Json | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -24,8 +24,8 @@ export interface Database {
           id: string
           email: string
           full_name?: string | null
-          role?: 'admin' | 'manager' | 'user' | 'staff' | 'client'
-          module_permissions?: Record<string, 'read' | 'write' | 'none'>
+          role?: 'admin' | 'manager' | 'staff' | 'client'
+          module_permissions?: Json | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -34,8 +34,8 @@ export interface Database {
           id?: string
           email?: string
           full_name?: string | null
-          role?: 'admin' | 'manager' | 'user' | 'staff' | 'client'
-          module_permissions?: Record<string, 'read' | 'write' | 'none'>
+          role?: 'admin' | 'manager' | 'staff' | 'client'
+          module_permissions?: Json | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -49,7 +49,7 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      user_role: 'admin' | 'manager' | 'user' | 'staff' | 'client'
+      user_role: 'admin' | 'manager' | 'staff' | 'client'
     }
   }
 }

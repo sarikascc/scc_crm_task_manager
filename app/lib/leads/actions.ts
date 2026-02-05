@@ -161,7 +161,7 @@ export async function updateLead(leadId: string, formData: LeadFormData) {
   return { data, error: null }
 }
 
-export async function getLead(leadId: string) {
+export async function getLead(leadId: string): Promise<{ data: Lead | null; error: string | null }> {
   const supabase = await createClient()
 
   const {

@@ -14,6 +14,8 @@ import { FollowUpForm } from './follow-up-form'
 import { FollowUpModal } from './follow-up-modal'
 import { FollowUpDeleteModal } from './follow-up-delete-modal'
 import { EmptyState } from '@/app/components/empty-state'
+import { Tooltip } from '@/app/components/ui/tooltip'
+import { useToast } from '@/app/components/ui/toast-context'
 
 interface LeadFollowUpsProps {
   leadId: string
@@ -106,6 +108,7 @@ export function LeadFollowUps({
   hideHeader = false,
 }: LeadFollowUpsProps) {
   const router = useRouter()
+  const { success: showSuccess, error: showError } = useToast()
   const [followUps, setFollowUps] = useState<LeadFollowUp[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -148,6 +151,7 @@ export function LeadFollowUps({
     setSubmitting(false)
 
     if (!result.error) {
+      showSuccess('Follow-up Added', 'The interaction has been recorded.')
       await fetchFollowUps()
       router.refresh()
       // Reset form by clearing the form fields
@@ -155,6 +159,8 @@ export function LeadFollowUps({
       if (form) {
         form.reset()
       }
+    } else {
+      showError('Failed to add follow-up', result.error)
     }
     return result
   }
@@ -172,10 +178,13 @@ export function LeadFollowUps({
     setSubmitting(false)
 
     if (!result.error) {
+      showSuccess('Follow-up Updated', 'The changes have been saved.')
       await fetchFollowUps()
       router.refresh()
       setEditModalOpen(false)
       setSelectedFollowUp(null)
+    } else {
+      showError('Update Failed', result.error)
     }
     return result
   }
@@ -193,10 +202,13 @@ export function LeadFollowUps({
     setDeleting(false)
 
     if (!result.error) {
+      showSuccess('Follow-up Deleted', 'The record has been removed.')
       await fetchFollowUps()
       router.refresh()
       setDeleteModalOpen(false)
       setSelectedFollowUp(null)
+    } else {
+      showError('Delete Failed', result.error || 'Failed to delete follow-up')
     }
   }
 
@@ -270,132 +282,115 @@ export function LeadFollowUps({
 
   return (
     <>
-      <div className={`h-full flex flex-col px-2 py-2 sm:px-3 sm:py-3 bg-gradient-to-br from-cyan-50/30 to-white rounded-xl ${className}`}>
+      <div className={`h-full flex flex-col bg-white/40 backdrop-blur-md rounded-2xl border border-white shadow-xl shadow-slate-200/50 ${className}`}>
+
+        {/* Header Section */}
         {!hideHeader && (
-          <div className="mb-2 sm:mb-3">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#06B6D4] to-[#0891b2] flex items-center justify-center shadow-md animate-gradient-shift">
-                  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h4 className="font-['Poppins',sans-serif] text-lg sm:text-xl font-bold text-[#0C4A6E]">Follow-Ups</h4>
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white/80 rounded-t-2xl">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#06B6D4] to-[#0891b2] flex items-center justify-center shadow-lg shadow-cyan-200/50">
+                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
               </div>
-              {leadFollowUpDate && (
-                <div className="flex items-center gap-1.5">
-                  <span className="hidden sm:inline text-xs font-medium text-gray-600">Next:</span>
-                  <span className="text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 px-2.5 py-1 rounded-full shadow-sm">
-                    {new Date(leadFollowUpDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </span>
-                </div>
-              )}
+              <h4 className="font-['Plus_Jakarta_Sans',sans-serif] text-xl font-extrabold text-[#0C4A6E] tracking-tight">Timeline</h4>
             </div>
+            {leadFollowUpDate && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-50 border border-cyan-100/50 shadow-sm animate-pulse-gentle">
+                <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-widest">Next</span>
+                <span className="text-sm font-extrabold text-cyan-900 tabular-nums">
+                  {new Date(leadFollowUpDate).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Scrollable Follow-Ups List */}
-        <div className="flex-1 overflow-y-auto pb-2">
-
+        {/* Scrollable Timeline */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 scrollbar-hide">
           {followUps.length === 0 ? (
-            <div className="flex h-full min-h-[400px] items-center justify-center w-full">
-              <div className="w-full max-w-md">
+            <div className="flex h-full items-center justify-center">
+              <div className="w-full max-w-[280px]">
                 <EmptyState
                   variant="followups"
-                  title="No follow-ups yet"
-                  description="Start tracking your interactions by adding your first follow-up. Keep notes and schedule next steps to stay organized."
+                  title="No interactions"
+                  description="Start the conversation by adding a follow-up note below."
                 />
               </div>
             </div>
           ) : (
-            <div className="space-y-3 pr-2">
+            <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-cyan-500/20 before:via-cyan-500/10 before:to-transparent">
               {followUps.map((followUp, index) => {
                 const canEdit = canEditFollowUp(followUp)
                 return (
-                  <div key={followUp.id} className={`relative animate-stagger-${Math.min(index + 1, 5)}`}>
-                    {/* Timeline Line with Gradient */}
-                    {index < followUps.length - 1 && (
-                      <div className="absolute left-5 top-14 bottom-0 w-0.5 bg-gradient-to-b from-[#06B6D4] via-[#22D3EE] to-gray-200"></div>
-                    )}
-
+                  <div key={followUp.id} className={`relative pl-12 animate-stagger-${Math.min(index + 1, 5)}`}>
                     {/* Timeline Dot */}
-                    <div className="absolute left-3.5 top-5 w-3 h-3 rounded-full bg-gradient-to-br from-[#06B6D4] to-[#0891b2] shadow-lg animate-timeline-dot"></div>
+                    <div className="absolute left-0 top-0 mt-1.5 h-10 w-10 flex items-center justify-center z-10">
+                      <div className="h-3 w-3 rounded-full bg-white border-2 border-cyan-500 shadow-[0_0_0_4px_rgba(6,182,212,0.1)]"></div>
+                    </div>
 
-                    {/* Activity Card */}
-                    <div className="ml-8 bg-white rounded-2xl shadow-md border border-gray-100 p-5 hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 glass">
-                      {/* Header: Avatar, Name, Time, Actions */}
-                      <div className="flex items-start gap-4 mb-4">
-                        {/* Avatar */}
-                        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-[#06B6D4] to-[#0891b2] flex items-center justify-center shadow-lg flex-shrink-0 ring-2 ring-cyan-200 ring-offset-2">
-                          <span className="text-base font-bold text-white">
+                    <div className="group bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-xl hover:border-cyan-100 transition-all duration-300 transform hover:-translate-y-1">
+                      {/* Interaction Header */}
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center border-2 border-white shadow-sm font-bold text-slate-600 text-xs">
                             {getInitials(followUp.created_by_name)}
-                          </span>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-3 mb-2">
-                            <div>
-                              <p className="font-['Poppins',sans-serif] text-sm font-bold text-[#0C4A6E]">
-                                {followUp.created_by_name || 'Unknown User'}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {getRelativeTime(followUp.created_at)}
-                              </p>
-                            </div>
-
-                            {/* Action Icons */}
-                            {canEdit && (
-                              <div className="flex items-center gap-1.5 flex-shrink-0">
-                                <button
-                                  onClick={() => handleEdit(followUp)}
-                                  className="group relative rounded-xl p-2 text-gray-400 transition-all duration-200 hover:bg-cyan-50 hover:text-[#06B6D4] hover:scale-110"
-                                  aria-label="Edit follow-up"
-                                >
-                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                                    Edit
-                                  </span>
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(followUp)}
-                                  className="group relative rounded-xl p-2 text-gray-400 transition-all duration-200 hover:bg-red-50 hover:text-red-600 hover:scale-110"
-                                  aria-label="Delete follow-up"
-                                >
-                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                                    Delete
-                                  </span>
-                                </button>
-                              </div>
-                            )}
                           </div>
-
-                          {/* Message Text */}
-                          <div className="bg-gradient-to-br from-cyan-50/50 to-gray-50 rounded-xl p-4 border border-cyan-100/50 mb-4 shadow-sm">
-                            <p className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
-                              {followUp.note}
+                          <div>
+                            <p className="text-sm font-extrabold text-slate-800 leading-none mb-1 font-['Plus_Jakarta_Sans',sans-serif]">
+                              {followUp.created_by_name || 'System'}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                              {getRelativeTime(followUp.created_at)}
                             </p>
                           </div>
+                        </div>
 
-                          {/* Next Follow-up Indicator */}
-                          <div className="flex items-center gap-2">
-                            <svg className="h-4 w-4 text-[#06B6D4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span className="text-xs font-medium text-gray-600">
-                              Next: <span className={`font-bold ${getFollowUpDateColor(followUp.follow_up_date)}`}>
-                                {formatDateOnly(followUp.follow_up_date)}
-                              </span>
-                            </span>
+                        {canEdit && (
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Tooltip content="Edit interaction">
+                              <button
+                                onClick={() => handleEdit(followUp)}
+                                className="p-1.5 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors border border-transparent hover:border-cyan-100"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                            </Tooltip>
+                            <Tooltip content="Delete record">
+                              <button
+                                onClick={() => handleDelete(followUp)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </Tooltip>
                           </div>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="relative">
+                        <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
+                          {followUp.note}
+                        </p>
+                      </div>
+
+                      {/* Footer: Date Reminder */}
+                      <div className="mt-4 pt-4 border-t border-slate-50 flex items-center gap-2">
+                        <div className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-100 inline-flex items-center gap-1.5">
+                          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${getFollowUpDateColor(followUp.follow_up_date)}`}>
+                            Next: {formatDateOnly(followUp.follow_up_date)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -406,86 +401,74 @@ export function LeadFollowUps({
           )}
         </div>
 
-        {/* Add Follow-Up Form - Attached to Left, Right, Bottom */}
-        <div className="-mx-2 -mb-2 sm:-mx-3 sm:-mb-3 mt-3 border-t-2 border-cyan-100 bg-white shadow-lg rounded-b-xl">
-          <div className="p-3">
-            <form
-              id="add-followup-form"
-              onSubmit={async (e) => {
-                e.preventDefault()
-                const formData = new FormData(e.currentTarget)
-                const followUpData: LeadFollowUpFormData = {
-                  follow_up_date: formData.get('follow_up_date') as string,
-                  note: formData.get('note') as string,
-                }
-                await handleCreate(followUpData)
-              }}
-              className="flex flex-col sm:flex-row gap-4 items-end"
-            >
-              {/* Note/Remark Field */}
-              <div className="flex-1 w-full sm:w-auto">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#06B6D4] mb-2">Add Follow-up</label>
-                <input
-                  type="text"
-                  name="note"
-                  required
-                  placeholder="Add remark..."
-                  className="w-full rounded-xl border-2 border-gray-300 bg-white px-4 py-3 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 focus:border-[#06B6D4] focus:outline-none focus:ring-4 focus:ring-cyan-100"
-                />
+        {/* Quick Add Form Section */}
+        <div className="p-5 border-t border-slate-100 bg-white/60 rounded-b-2xl">
+          <form
+            id="add-followup-form"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              const formData = new FormData(e.currentTarget)
+              const followUpData: LeadFollowUpFormData = {
+                follow_up_date: formData.get('follow_up_date') as string,
+                note: formData.get('note') as string,
+              }
+              await handleCreate(followUpData)
+            }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+              <div className="sm:col-span-12">
+                <div className="relative group">
+                  <textarea
+                    name="note"
+                    required
+                    placeholder="Briefly describe the interaction..."
+                    rows={2}
+                    className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 placeholder-slate-400 shadow-sm transition-all duration-300 focus:border-cyan-500 focus:outline-none focus:ring-4 focus:ring-cyan-500/10 resize-none group-hover:border-slate-300"
+                  ></textarea>
+                </div>
               </div>
 
-              {/* Date Field */}
-              <div className="flex-1 sm:flex-initial sm:w-52">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#06B6D4] mb-2">Next Follow-up</label>
+              <div className="sm:col-span-8">
                 <div className="relative">
+                  <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
                   <input
                     type="date"
                     name="follow_up_date"
                     required
-                    className="w-full rounded-xl border-2 border-gray-300 bg-white px-4 py-3 pl-11 text-sm text-gray-700 shadow-sm transition-all duration-200 focus:border-[#06B6D4] focus:outline-none focus:ring-4 focus:ring-cyan-100"
+                    className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-2.5 pl-11 text-xs font-bold text-slate-700 shadow-sm transition-all duration-300 focus:border-cyan-500 focus:outline-none focus:ring-4 focus:ring-cyan-500/10"
                   />
-                  <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#06B6D4] pointer-events-none"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
+                  <div className="absolute -top-2.5 left-4 px-1 bg-white text-[10px] font-bold text-cyan-600 uppercase tracking-widest border border-cyan-50 rounded">Set Reminder</div>
                 </div>
               </div>
 
-              {/* Save Button */}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="group relative flex-shrink-0 btn-gradient-smooth rounded-xl px-6 py-3 font-bold shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                aria-label="Save follow-up"
-              >
-                {submitting ? (
-                  <div className="flex items-center gap-2">
+              <div className="sm:col-span-4 h-full">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full h-[41px] btn-gradient-smooth rounded-xl flex items-center justify-center gap-2 font-bold text-white shadow-lg shadow-cyan-500/20 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:active:scale-100"
+                >
+                  {submitting ? (
                     <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    <span>Saving...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>Save</span>
-                  </div>
-                )}
-              </button>
-            </form>
-          </div>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-sm">Log Note</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ interface EmptyStateProps {
   description?: string
   actionLabel?: string
   onAction?: () => void
-  variant?: 'default' | 'leads' | 'followups' | 'search'
+  variant?: 'default' | 'leads' | 'followups' | 'search' | 'users'
 }
 
 export function EmptyState({
@@ -47,6 +47,21 @@ export function EmptyState({
           strokeLinejoin="round"
           strokeWidth={1.5}
           d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+        />
+      </svg>
+    ),
+    users: (
+      <svg
+        className="w-24 h-24 sm:w-32 sm:h-32 text-[#6366F1]"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
         />
       </svg>
     ),
@@ -93,7 +108,7 @@ export function EmptyState({
           <div className="absolute w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-gradient-to-br from-[#06B6D4]/10 to-[#7C3AED]/10 animate-pulse"></div>
           <div className="absolute w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-[#06B6D4]/20 to-[#7C3AED]/20 animate-ping"></div>
         </div>
-        
+
         {/* Icon with animation */}
         <div className="relative transform transition-all duration-500 hover:scale-110 animate-bounce-slow">
           {displayIcon}

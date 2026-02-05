@@ -16,6 +16,7 @@ export type UserData = {
     is_active: boolean
     module_permissions: ModulePermissions
     created_at: string
+    deleted_at?: string | null
 }
 
 export type CreateUserFormData = {
@@ -34,13 +35,28 @@ export type UpdateUserFormData = {
     password?: string // Optional password update
 }
 
-export async function getUsers() {
+export async function getUsers(filters?: { search?: string; role?: string; status?: string }) {
     const supabase = await createClient()
 
-    const { data: users, error } = await supabase
+    let query = (supabase
         .from('users')
         .select('*')
-        .order('created_at', { ascending: false })
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false }) as any)
+
+    if (filters?.search) {
+        query = query.or(`full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%`)
+    }
+
+    if (filters?.role && filters.role !== 'all') {
+        query = query.eq('role', filters.role)
+    }
+
+    if (filters?.status && filters.status !== 'all') {
+        query = query.eq('is_active', filters.status === 'active')
+    }
+
+    const { data: users, error } = await query
 
     if (error) {
         console.error('Error fetching users:', error)
@@ -53,11 +69,12 @@ export async function getUsers() {
 export async function getUser(id: string) {
     const supabase = await createClient()
 
-    const { data: user, error } = await supabase
+    const { data: user, error } = await (supabase
         .from('users')
         .select('*')
         .eq('id', id)
-        .single()
+        .is('deleted_at', null)
+        .single() as any)
 
     if (error) {
         console.error('Error fetching user:', error)
@@ -77,43 +94,45 @@ export async function createUser(formData: CreateUserFormData) {
     const supabaseAdmin = createAdminClient()
 
     // 1. Create user in Supabase Auth
+    // We pass NO metadata initially to make the trigger as "light" as possible
+    // This prevents the trigger from trying to cast roles that might not exist yet.
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: formData.email,
         password: formData.password,
-        user_metadata: {
-            full_name: formData.full_name,
-            role: formData.role,
-        },
-        email_confirm: true, // Auto-confirm email since admin created it
+        email_confirm: true,
     })
 
     if (authError || !authData.user) {
-        console.error('Error creating auth user:', authError)
-        return { error: authError?.message || 'Failed to create user authentication' }
+        console.error('Auth Error Details:', authError)
+        // If it's a database error, we want the user to see the EXACT details (e.g., which column or type is failing)
+        const isDbError = authError?.message?.includes('Database error')
+        return {
+            error: isDbError
+                ? `Database Error: ${authError?.message}. (Check if your users table and user_role enum are up to date)`
+                : (authError?.message || 'Failed to create user account')
+        }
     }
 
-    // 2. The trigger `handle_new_user` should automatically insert into `users` table.
-    // However, it might not set `module_permissions` correctly if we didn't pass it in metadata (and trigger doesn't read it from there yet),
-    // OR we should just update the user record explicitly to be safe and ensure permissions are set.
-
-    // Let's update the user record with the permissions and correct role (trigger sets role from metadata, but permissions need manual update)
+    // 2. Explicitly update/insert the profile
+    // Since the trigger might have failed OR we want to ensure specific data,
+    // we use an "upsert" to be safe.
     const { error: dbError } = await supabaseAdmin
         .from('users')
-        .update({
+        .upsert({
+            id: authData.user.id,
+            email: formData.email,
             role: formData.role,
-            module_permissions: formData.module_permissions,
-            full_name: formData.full_name, // Ensure sync
-            is_active: true
-        })
-        .eq('id', authData.user.id)
+            module_permissions: formData.module_permissions as any,
+            full_name: formData.full_name,
+            is_active: true,
+            updated_at: new Date().toISOString()
+        } as any)
 
     if (dbError) {
-        // If DB update fails, we might want to delete the auth user to avoid inconsistency, 
-        // but for now let's just report error.
-        console.error('Error updating user profile:', dbError)
-        // Try to cleanup
+        console.error('Profile Sync Error:', dbError)
+        // Cleanup the auth user since we couldn't create the profile
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-        return { error: 'Failed to create user profile' }
+        return { error: 'Auth account created, but profile sync failed. Please check DB roles.' }
     }
 
     revalidatePath('/dashboard/users')
@@ -134,7 +153,7 @@ export async function updateUser(id: string, formData: UpdateUserFormData) {
 
     const { error } = await supabase
         .from('users')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id)
 
     if (error) {
@@ -157,19 +176,43 @@ export async function updateUser(id: string, formData: UpdateUserFormData) {
     return { success: true }
 }
 
-export async function toggleUserStatus(id: string, currentStatus: boolean) {
+export async function deleteUser(id: string) {
     await requireRole(['admin'])
-    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
 
-    const { error } = await supabase
+    // Soft delete: set deleted_at and is_active to false
+    const { error } = await supabaseAdmin
         .from('users')
-        .update({ is_active: !currentStatus })
+        .update({
+            deleted_at: new Date().toISOString(),
+            is_active: false
+        } as any)
         .eq('id', id)
 
     if (error) {
-        return { error: 'Failed to update status' }
+        console.error('Error deleting user:', error)
+        return { error: 'Failed to delete user' }
     }
 
+    // Optionally sign out the user sessions if they're logged in
+    // Note: This won't immediately kick them out if they have a valid session, 
+    // but they won't be able to log in again or perform actions if RLS checks for deleted_at.
+
     revalidatePath('/dashboard/users')
+    return { success: true }
+}
+export async function changeUserPassword(userId: string, password: string) {
+    await requireRole(['admin'])
+    const supabaseAdmin = createAdminClient()
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: password
+    })
+
+    if (error) {
+        console.error('Error changing password:', error)
+        return { error: error.message || 'Failed to change password' }
+    }
+
     return { success: true }
 }

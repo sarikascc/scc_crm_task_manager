@@ -43,11 +43,11 @@ export function LeadModal({
       onClick={onClose}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
 
       {/* Modal */}
       <div
-        className="relative z-10 w-full max-w-2xl rounded-2xl bg-white shadow-xl"
+        className="relative z-10 w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -58,7 +58,7 @@ export function LeadModal({
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Close"
+            data-tooltip="Close"
           >
             <svg
               className="h-6 w-6"

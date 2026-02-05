@@ -2,14 +2,14 @@
 -- This table extends Supabase auth.users with CRM-specific data
 
 -- Create enum for user roles
-CREATE TYPE user_role AS ENUM ('admin', 'manager', 'user');
+CREATE TYPE user_role AS ENUM ('admin', 'manager', 'staff', 'client');
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
   full_name TEXT,
-  role user_role NOT NULL DEFAULT 'user',
+  role user_role NOT NULL DEFAULT 'staff',
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -65,7 +65,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NULL),
-    COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'user'),
+    COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'staff'),
     true
   );
   RETURN NEW;

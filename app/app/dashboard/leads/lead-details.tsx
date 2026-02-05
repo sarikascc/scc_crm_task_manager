@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Lead, LeadStatus } from '@/lib/leads/actions'
 import { LeadFollowUps } from './lead-followups'
+import { useToast } from '@/app/components/ui/toast-context'
 
 interface LeadDetailsProps {
   lead: Lead
@@ -115,6 +116,7 @@ export function LeadDetails({
   userRole,
 }: LeadDetailsProps) {
   const [showNotesEdit, setShowNotesEdit] = useState(false)
+  const { success: showSuccess } = useToast()
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -125,7 +127,7 @@ export function LeadDetails({
 
   const handleCopyPhone = () => {
     navigator.clipboard.writeText(lead.phone)
-    // You could add a toast notification here
+    showSuccess('Copied to Clipboard', `Phone number ${lead.phone} has been copied.`)
   }
 
   const handleCall = () => {
@@ -137,7 +139,7 @@ export function LeadDetails({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#F5F3FF]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)]">
       {/* Header Bar */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
@@ -184,7 +186,7 @@ export function LeadDetails({
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
         {/* Left Section - Lead Info */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 lg:px-6 lg:border-r lg:border-gray-200 bg-[#F5F3FF]">
+        <div className="flex-1 overflow-y-auto px-4 py-6 lg:px-6 lg:border-r lg:border-gray-200 bg-[var(--background)]">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Lead Profile Card */}
             <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 hover:shadow-lg transition-shadow">
@@ -196,14 +198,14 @@ export function LeadDetails({
                       {getInitials(lead.name)}
                     </span>
                   </div>
-                  
+
                   {/* Name & Company */}
                   <div className="flex-1 min-w-0">
                     <h1 className="text-2xl font-bold text-[#1E1B4B] mb-1">{lead.name}</h1>
                     {lead.company_name && (
                       <p className="text-base text-gray-600 font-medium mb-4">{lead.company_name}</p>
                     )}
-                    
+
                     {/* Phone with Actions */}
                     <div className="flex items-center gap-3">
                       <span className="text-base font-semibold text-[#1E1B4B]">{lead.phone}</span>
@@ -242,7 +244,7 @@ export function LeadDetails({
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Status Badge - Top Right */}
                 <div className="flex-shrink-0">
                   <StatusPill status={lead.status} />
@@ -319,7 +321,7 @@ export function LeadDetails({
 
             {/* Notes Card */}
             {lead.notes && (
-              <div 
+              <div
                 className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative group"
                 onMouseEnter={() => setShowNotesEdit(true)}
                 onMouseLeave={() => setShowNotesEdit(false)}

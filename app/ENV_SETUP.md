@@ -7,6 +7,7 @@ Create a `.env.local` file in the project root with these variables:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 ```
 
 ## Where to Find Values
@@ -17,8 +18,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 4. Copy:
    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
    - **Publishable key** (from "Publishable key" section) → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-     - Format: `sb_publishable_...` (new format)
-     - **Important**: Use the new "Publishable key", not the legacy "anon" key
+   - **Service Role key** (from "Secret key" section) → `SUPABASE_SERVICE_ROLE_KEY`
+     - **Important**: This is a secret key. Never share it or prefix it with `NEXT_PUBLIC_`.
 
 ## Important Notes
 
@@ -36,8 +37,8 @@ The app validates environment variables at runtime. If missing, you'll see a cle
 ## Security
 
 - ✅ `NEXT_PUBLIC_*` variables are safe for browser/client code
-- ❌ Service role key (`SUPABASE_SERVICE_ROLE_KEY`) is NOT used in this project
-- ❌ Never use service role key in client components
+- ✅ `SUPABASE_SERVICE_ROLE_KEY` is **REQUIRED** for administrative tasks (User Management).
+- ❌ **CRITICAL**: Never prefix `SUPABASE_SERVICE_ROLE_KEY` with `NEXT_PUBLIC_`. It must remain server-side only.
 
 ## Troubleshooting
 

@@ -36,18 +36,27 @@ export async function login(
     }
   }
 
-  // Check if user exists in users table and is active
-  const { data: userData, error: userError } = await supabase
+  // Check if user exists in users table and is active/not deleted
+  // We cast to any because the generated types might not have the new columns yet
+  const { data: userData, error: userError } = await (supabase
     .from('users')
-    .select('id, is_active, role')
+    .select('id, is_active, role, deleted_at')
     .eq('id', data.user.id)
-    .single()
+    .single() as any)
 
   if (userError || !userData) {
     // User not found in users table
     await supabase.auth.signOut()
     return {
       error: 'User not found. Please contact administrator.',
+    }
+  }
+
+  if (userData.deleted_at) {
+    // User is deleted
+    await supabase.auth.signOut()
+    return {
+      error: 'Your account has been deleted and access is no longer permitted.',
     }
   }
 
@@ -69,4 +78,3 @@ export async function logout() {
   revalidatePath('/', 'layout')
   redirect('/login')
 }
-

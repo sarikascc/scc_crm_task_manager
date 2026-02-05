@@ -174,6 +174,7 @@ export function Sidebar({
                     onClick={() => setIsCollapsed(true)}
                     className="flex items-center justify-center h-7 w-7 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 flex-shrink-0"
                     aria-label="Collapse sidebar"
+                    data-tooltip="Collapse"
                   >
                     <svg
                       className="h-4 w-4 text-white"
@@ -290,6 +291,7 @@ export function Sidebar({
                 border border-[#06B6D4]/20
               "
               aria-label="Expand sidebar"
+              data-tooltip="Expand"
             >
               <svg
                 className="h-5 w-5"

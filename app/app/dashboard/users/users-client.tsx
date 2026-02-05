@@ -1,0 +1,185 @@
+'use client'
+
+import { useState, useTransition, useEffect } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { UsersFilters } from '@/app/components/users/users-filters'
+import { UsersTable } from '@/app/components/users/users-table'
+import { UserModal } from '@/app/components/users/user-modal'
+import { ChangePasswordModal } from '@/app/components/users/change-password-modal'
+import { UserDeleteModal } from '@/app/components/users/user-delete-modal'
+import { UserData, UserRole, createUser, updateUser, deleteUser } from '@/lib/users/actions'
+import { useToast } from '@/app/components/ui/toast-context'
+
+interface UsersClientProps {
+    initialUsers: UserData[]
+    currentUserId: string
+}
+
+export default function UsersClient({ initialUsers, currentUserId }: UsersClientProps) {
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
+    const [isPending, startTransition] = useTransition()
+    const { success: showSuccess, error: showError } = useToast()
+
+    // Current filter values from URL
+    const currentSearch = searchParams.get('search') || ''
+    const currentRole = (searchParams.get('role') as UserRole) || 'all'
+
+    // Modal States
+    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+    const [selectedUser, setSelectedUser] = useState<UserData | undefined>(undefined)
+
+    // Password Modal State
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+    const [userForPassword, setUserForPassword] = useState<UserData | undefined>(undefined)
+
+    // Delete Modal State
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+    const [userToDelete, setUserToDelete] = useState<UserData | undefined>(undefined)
+
+    // Helper to update filters
+    const updateFilters = (updates: Record<string, string | null>) => {
+        const params = new URLSearchParams(searchParams.toString())
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value === null || value === 'all' || value === '') {
+                params.delete(key)
+            } else {
+                params.set(key, value)
+            }
+        })
+
+        startTransition(() => {
+            router.push(`${pathname}?${params.toString()}`)
+        })
+    }
+
+    // Handlers
+    const handleCreateOpen = () => {
+        setModalMode('create')
+        setSelectedUser(undefined)
+        setIsModalOpen(true)
+    }
+
+    const handleEditOpen = (user: UserData) => {
+        setModalMode('edit')
+        setSelectedUser(user)
+        setIsModalOpen(true)
+    }
+
+    const handleChangePasswordOpen = (user: UserData) => {
+        setUserForPassword(user)
+        setIsPasswordModalOpen(true)
+    }
+
+    const handleDeleteOpen = (user: UserData) => {
+        setUserToDelete(user)
+        setIsDeleteModalOpen(true)
+    }
+
+    const confirmDelete = async () => {
+        if (!userToDelete) return { error: 'No user selected' }
+        const result = await deleteUser(userToDelete.id)
+        if (result.success) {
+            showSuccess('User Deleted', `${userToDelete.full_name || userToDelete.email} has been removed successfully.`)
+            router.refresh()
+            return { success: true }
+        }
+        showError('Delete Failed', result.error || 'Could not delete user.')
+        return { error: result.error || 'Failed to delete user' }
+    }
+
+    const handleModalSubmit = async (formData: any) => {
+        if (modalMode === 'create') {
+            const result = await createUser(formData)
+            if (result.error) {
+                showError('Creation Failed', result.error)
+                return { error: result.error, success: false }
+            }
+            showSuccess('User Created', `${formData.full_name} has been added successfully.`)
+        } else {
+            if (!selectedUser) return { error: 'No user selected' }
+            const result = await updateUser(selectedUser.id, formData)
+            if (result.error) {
+                showError('Update Failed', result.error)
+                return { error: result.error, success: false }
+            }
+            showSuccess('User Updated', `${formData.full_name || selectedUser.full_name} has been updated.`)
+        }
+
+        // Success
+        setIsModalOpen(false)
+        router.refresh()
+        return { success: true }
+    }
+
+    return (
+        <div className="flex h-full flex-col p-4 lg:p-6">
+            {/* Page Title and Create Button */}
+            <div className="mb-4 flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-slate-900 font-display">User Management</h1>
+                <button
+                    onClick={handleCreateOpen}
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#0891b2] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 active:translate-y-0"
+                >
+                    <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add User
+                </button>
+            </div>
+
+            {/* Main Content Card */}
+            <div className={`flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 flex flex-col transition-opacity duration-200 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
+                <UsersFilters
+                    roleFilter={currentRole}
+                    onRoleChange={(role) => updateFilters({ role })}
+                    searchQuery={currentSearch}
+                    onSearchChange={(search) => updateFilters({ search })}
+                    onClearFilters={() => updateFilters({ search: null, role: null })}
+                />
+
+                <div className="flex-1 overflow-y-auto">
+                    <UsersTable
+                        users={initialUsers}
+                        currentUserId={currentUserId}
+                        onEdit={handleEditOpen}
+                        onChangePassword={handleChangePasswordOpen}
+                        onDelete={handleDeleteOpen}
+                    />
+                </div>
+            </div>
+
+            {/* Modal */}
+            <UserModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                mode={modalMode}
+                initialData={selectedUser}
+                onSubmit={handleModalSubmit}
+            />
+
+            {/* Change Password Modal */}
+            <ChangePasswordModal
+                isOpen={isPasswordModalOpen}
+                onClose={() => setIsPasswordModalOpen(false)}
+                user={userForPassword}
+            />
+
+            {/* Delete Confirmation Modal */}
+            <UserDeleteModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={confirmDelete}
+                userName={userToDelete?.full_name || userToDelete?.email || 'this user'}
+            />
+        </div>
+    )
+}

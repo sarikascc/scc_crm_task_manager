@@ -1,7 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #F8FAFC;
   --foreground: #171717;
 
   /* Design System Colors - Cyan Primary (Login Theme) */
@@ -42,8 +43,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-open-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-display: var(--font-poppins), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,7 +57,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-open-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -352,6 +353,81 @@ body {
   animation: ring-pulse 2s ease-in-out infinite;
 }
 
+/* Custom Tooltip System */
+@layer utilities {
+  [data-tooltip] {
+    position: relative;
+  }
+
+  /* Tooltip Box */
+  [data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(0) scale(0.9);
+    margin-bottom: 12px;
+    padding: 6px 12px;
+    background-color: #0f172a;
+    /* Slate 900 */
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 100 !important;
+    pointer-events: none;
+  }
+
+  /* Tooltip Arrow */
+  [data-tooltip]::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(0);
+    margin-bottom: 4px;
+    border-width: 6px 6px 0 6px;
+    border-style: solid;
+    border-color: #0f172a transparent transparent transparent;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 101 !important;
+    pointer-events: none;
+  }
+
+  [data-tooltip]:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-6px) scale(1);
+  }
+
+  [data-tooltip]:hover::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-6px);
+  }
+
+  /* Right-aligned variant to avoid cutting at screen edges */
+  .tooltip-left [data-tooltip]::after,
+  .tooltip-left [data-tooltip]::before {
+    left: auto;
+    right: 0;
+    transform: translateX(0) scale(0.9);
+  }
+
+  .tooltip-left [data-tooltip]:hover::after,
+  .tooltip-left [data-tooltip]:hover::before {
+    transform: translateX(0) translateY(-6px) scale(1);
+  }
+}
+
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
 
@@ -368,5 +444,44 @@ body {
   .animate-gradient-shift,
   .animate-ring-pulse {
     animation: none !important;
+  }
+}
+
+/* Toast Animations */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-progress {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Base Styles Modification */
+@media (max-width: 640px) {
+  .fixed.top-6.right-6 {
+    top: auto !important;
+    bottom: 1.5rem !important;
+    right: 50% !important;
+    transform: translateX(50%) !important;
+    width: 90% !important;
+    max-width: 340px !important;
   }
 }

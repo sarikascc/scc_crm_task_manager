@@ -8,6 +8,7 @@ import { LeadDetails } from './lead-details'
 import { DeleteConfirmModal } from './delete-confirm-modal'
 import { LeadsFilters } from './leads-filters'
 import { createLead, updateLead, getLead, deleteLead, LeadFormData, Lead, LeadStatus } from '@/lib/leads/actions'
+import { useToast } from '@/app/components/ui/toast-context'
 
 type LeadListItem = {
   id: string
@@ -28,6 +29,7 @@ interface LeadsClientProps {
 
 export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps) {
   const router = useRouter()
+  const { success: showSuccess, error: showError } = useToast()
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
@@ -170,7 +172,10 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
     const result = await createLead(formData)
     setLoading(false)
     if (!result.error) {
+      showSuccess('Lead Created', `Lead for ${formData.name} has been created successfully.`)
       router.refresh()
+    } else {
+      showError('Creation Failed', result.error)
     }
     return result
   }
@@ -181,6 +186,7 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
     const result = await updateLead(selectedLeadId, formData)
     setLoading(false)
     if (!result.error) {
+      showSuccess('Lead Updated', `Information for ${formData.name} has been saved.`)
       router.refresh()
       // If details view is open, refresh the lead data
       if (detailsModalOpen && selectedLeadId) {
@@ -189,6 +195,8 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
           setSelectedLead(updatedResult.data)
         }
       }
+    } else {
+      showError('Update Failed', result.error)
     }
     return result
   }
@@ -207,7 +215,7 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
       setSelectedLeadId(leadId)
       setEditModalOpen(true)
     } else {
-      alert(result.error || 'Failed to load lead for editing')
+      showError('Error', result.error || 'Failed to load lead for editing')
     }
   }
 
@@ -247,12 +255,13 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
     setDeleting(false)
 
     if (!result.error) {
+      showSuccess('Lead Deleted', `${deleteLeadName} has been removed successfully.`)
       setDeleteModalOpen(false)
       setSelectedLeadId(null)
       setDeleteLeadName('')
       router.refresh()
     } else {
-      alert(result.error || 'Failed to delete lead')
+      showError('Delete Failed', result.error || 'Failed to delete lead')
     }
   }
 
@@ -287,8 +296,7 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
 
   return (
     <>
-      {/* Full Height Container */}
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col p-4 lg:p-6">
         {/* Page Title and Create Lead Button */}
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-[#1E1B4B]">Leads</h1>
@@ -318,7 +326,7 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
               <p className="text-sm text-blue-800">Loading...</p>
             </div>
           )}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-y-auto">
             <LeadsTable
               leads={filteredAndSortedLeads}
               currentUserId={currentUserId}
@@ -327,7 +335,7 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
               onEdit={handleEdit}
               onDelete={handleDelete}
               sortField={sortField}
-              sortDirection={sortField ? sortDirection : null}
+              sortDirection={sortField ? sortDirection : undefined}
               onSort={handleSort}
               isFiltered={statusFilter !== 'all' || searchQuery.trim() !== '' || followUpDateFilter !== 'all'}
             />
