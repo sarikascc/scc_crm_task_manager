@@ -12,8 +12,7 @@ interface LeadDetailsProps {
   onDelete: () => void
   canEdit: boolean
   canDelete: boolean
-  currentUserId: string
-  userRole: string
+  canWrite: boolean
 }
 
 function StatusPill({ status }: { status: LeadStatus }) {
@@ -112,8 +111,7 @@ export function LeadDetails({
   onDelete,
   canEdit,
   canDelete,
-  currentUserId,
-  userRole,
+  canWrite,
 }: LeadDetailsProps) {
   const [showNotesEdit, setShowNotesEdit] = useState(false)
   const { success: showSuccess } = useToast()
@@ -362,9 +360,8 @@ export function LeadDetails({
         <div className="w-full lg:w-96 xl:w-[420px] overflow-hidden flex flex-col bg-white border-l border-gray-200 shadow-lg">
           <LeadFollowUps
             leadId={lead.id}
-            currentUserId={currentUserId}
-            userRole={userRole}
             leadFollowUpDate={lead.follow_up_date}
+            canWrite={canWrite}
           />
         </div>
       </div>

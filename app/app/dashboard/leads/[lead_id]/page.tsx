@@ -1,9 +1,10 @@
-import { requireAuth } from '@/lib/auth/utils'
+import { requireAuth, hasPermission } from '@/lib/auth/utils'
 import { getLead } from '@/lib/leads/actions'
 import { notFound, redirect } from 'next/navigation'
 import { LeadDetailView } from './lead-detail-view'
 import { Header } from '@/app/components/dashboard/header'
 import Link from 'next/link'
+import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
 
 interface LeadDetailPageProps {
   params: Promise<{ lead_id: string }>
@@ -12,6 +13,11 @@ interface LeadDetailPageProps {
 export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
   const user = await requireAuth()
   const { lead_id } = await params
+  const canRead = await hasPermission(user, MODULE_PERMISSION_IDS.leads, 'read')
+
+  if (!canRead) {
+    redirect('/dashboard?error=unauthorized')
+  }
 
   // Fetch lead data
   const result = await getLead(lead_id)
@@ -21,14 +27,7 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
   }
 
   const lead = result.data
-
-  // Check permissions
-  const isAdmin = user.role === 'admin'
-  const isOwner = lead.created_by === user.id
-
-  if (!isAdmin && !isOwner) {
-    redirect('/dashboard/leads')
-  }
+  const canWrite = await hasPermission(user, MODULE_PERMISSION_IDS.leads, 'write')
 
   const breadcrumb = (
     <div className="flex items-center gap-2 text-sm">
@@ -54,8 +53,7 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
       <div className="flex-1 overflow-hidden px-4 lg:px-6 pt-2 lg:pt-3 pb-2">
         <LeadDetailView
           lead={lead}
-          currentUserId={user.id}
-          userRole={user.role}
+          canWrite={canWrite}
         />
       </div>
     </div>

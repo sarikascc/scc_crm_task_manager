@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { UsersFilters } from '@/app/components/users/users-filters'
 import { UsersTable } from '@/app/components/users/users-table'
@@ -13,9 +13,10 @@ import { useToast } from '@/app/components/ui/toast-context'
 interface UsersClientProps {
     initialUsers: UserData[]
     currentUserId: string
+    canWrite: boolean
 }
 
-export default function UsersClient({ initialUsers, currentUserId }: UsersClientProps) {
+export default function UsersClient({ initialUsers, currentUserId, canWrite }: UsersClientProps) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
@@ -30,6 +31,7 @@ export default function UsersClient({ initialUsers, currentUserId }: UsersClient
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
     const [selectedUser, setSelectedUser] = useState<UserData | undefined>(undefined)
+    const [isReadOnlyModal, setIsReadOnlyModal] = useState(false)
 
     // Password Modal State
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
@@ -57,29 +59,47 @@ export default function UsersClient({ initialUsers, currentUserId }: UsersClient
 
     // Handlers
     const handleCreateOpen = () => {
+        if (!canWrite) {
+            showError('Read-only Access', 'You do not have permission to add users.')
+            return
+        }
         setModalMode('create')
         setSelectedUser(undefined)
+        setIsReadOnlyModal(false)
         setIsModalOpen(true)
     }
 
     const handleEditOpen = (user: UserData) => {
         setModalMode('edit')
         setSelectedUser(user)
+        setIsReadOnlyModal(!canWrite)
         setIsModalOpen(true)
     }
 
     const handleChangePasswordOpen = (user: UserData) => {
+        if (!canWrite) {
+            showError('Read-only Access', 'You do not have permission to change passwords.')
+            return
+        }
         setUserForPassword(user)
         setIsPasswordModalOpen(true)
     }
 
     const handleDeleteOpen = (user: UserData) => {
+        if (!canWrite) {
+            showError('Read-only Access', 'You do not have permission to deactivate users.')
+            return
+        }
         setUserToDelete(user)
         setIsDeleteModalOpen(true)
     }
 
     const confirmDelete = async () => {
         if (!userToDelete) return { error: 'No user selected' }
+        if (!canWrite) {
+            showError('Read-only Access', 'You do not have permission to deactivate users.')
+            return { error: 'Permission denied' }
+        }
         const result = await deleteUser(userToDelete.id)
         if (result.success) {
             showSuccess('User Deleted', `${userToDelete.full_name || userToDelete.email} has been removed successfully.`)
@@ -91,6 +111,10 @@ export default function UsersClient({ initialUsers, currentUserId }: UsersClient
     }
 
     const handleModalSubmit = async (formData: any) => {
+        if (!canWrite) {
+            showError('Read-only Access', 'You do not have permission to update users.')
+            return { error: 'Permission denied', success: false }
+        }
         if (modalMode === 'create') {
             const result = await createUser(formData)
             if (result.error) {
@@ -110,6 +134,7 @@ export default function UsersClient({ initialUsers, currentUserId }: UsersClient
 
         // Success
         setIsModalOpen(false)
+        setIsReadOnlyModal(false)
         router.refresh()
         return { success: true }
     }
@@ -121,7 +146,9 @@ export default function UsersClient({ initialUsers, currentUserId }: UsersClient
                 <h1 className="text-2xl font-bold text-slate-900 font-display">User Management</h1>
                 <button
                     onClick={handleCreateOpen}
-                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#0891b2] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 active:translate-y-0"
+                    disabled={!canWrite}
+                    title={canWrite ? 'Add user' : 'Read-only access'}
+                    className={`flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#0891b2] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 active:translate-y-0 ${!canWrite ? 'opacity-50 cursor-not-allowed hover:shadow-lg hover:-translate-y-0' : ''}`}
                 >
                     <svg
                         className="h-5 w-5"
@@ -150,6 +177,7 @@ export default function UsersClient({ initialUsers, currentUserId }: UsersClient
                     <UsersTable
                         users={initialUsers}
                         currentUserId={currentUserId}
+                        canWrite={canWrite}
                         onEdit={handleEditOpen}
                         onChangePassword={handleChangePasswordOpen}
                         onDelete={handleDeleteOpen}
@@ -160,9 +188,13 @@ export default function UsersClient({ initialUsers, currentUserId }: UsersClient
             {/* Modal */}
             <UserModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => {
+                    setIsModalOpen(false)
+                    setIsReadOnlyModal(false)
+                }}
                 mode={modalMode}
                 initialData={selectedUser}
+                readOnly={isReadOnlyModal}
                 onSubmit={handleModalSubmit}
             />
 

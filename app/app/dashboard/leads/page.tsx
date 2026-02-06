@@ -1,6 +1,8 @@
-import { requireAuth } from '@/lib/auth/utils'
+import { requireAuth, hasPermission } from '@/lib/auth/utils'
 import { createClient } from '@/lib/supabase/server'
 import { LeadsClient } from './leads-client'
+import { redirect } from 'next/navigation'
+import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
 
 async function getLeads() {
   const supabase = await createClient()
@@ -20,13 +22,19 @@ async function getLeads() {
 
 export default async function LeadsPage() {
   const user = await requireAuth()
+  const canRead = await hasPermission(user, MODULE_PERMISSION_IDS.leads, 'read')
+
+  if (!canRead) {
+    redirect('/dashboard?error=unauthorized')
+  }
+
+  const canWrite = await hasPermission(user, MODULE_PERMISSION_IDS.leads, 'write')
   const leads = await getLeads()
 
   return (
     <LeadsClient
       leads={leads}
-      currentUserId={user.id}
-      userRole={user.role}
+      canWrite={canWrite}
     />
   )
 }

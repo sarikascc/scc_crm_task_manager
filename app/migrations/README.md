@@ -22,6 +22,12 @@ Consolidates all lead-related setup:
 - Comprehensive RLS policies for both tables
 - Timestamps update triggers
 
+### 003_module_permissions_rls.sql
+Updates lead and follow-up RLS policies to respect `module_permissions`:
+- Read access: `leads` / `follow_ups` set to `read` or `write`
+- Write access: `leads` / `follow_ups` set to `write`
+- Admins and managers retain full access (except module-specific UI gates)
+
 ## How to Apply Migrations
 
 ### Option 1: Using Supabase Dashboard
@@ -29,6 +35,7 @@ Consolidates all lead-related setup:
 2. Navigate to **SQL Editor**.
 3. Copy and paste the contents of `001_auth_user_management.sql` and run it.
 4. Copy and paste the contents of `002_lead_management.sql` and run it.
+5. Copy and paste the contents of `003_module_permissions_rls.sql` and run it.
 
 ### Option 2: Using Supabase CLI
 ```bash

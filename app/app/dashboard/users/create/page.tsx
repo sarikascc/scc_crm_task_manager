@@ -1,9 +1,16 @@
-import { requireRole } from '@/lib/auth/utils'
+import { requireAuth, hasPermission } from '@/lib/auth/utils'
 import { DashboardLayout } from '@/app/components/dashboard/dashboard-layout'
 import { CreateUserClient } from './create-user-client'
+import { redirect } from 'next/navigation'
+import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
 
 export default async function CreateUserPage() {
-    const currentUser = await requireRole(['admin'])
+    const currentUser = await requireAuth()
+    const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.users, 'write')
+
+    if (!canWrite) {
+        redirect('/dashboard?error=unauthorized')
+    }
 
     return (
         <DashboardLayout
@@ -11,6 +18,7 @@ export default async function CreateUserPage() {
             userEmail={currentUser.email}
             userFullName={currentUser.fullName}
             userRole={currentUser.role}
+            modulePermissions={currentUser.modulePermissions}
         >
             <div className="px-4 sm:px-6 lg:px-8 py-8">
                 <CreateUserClient />

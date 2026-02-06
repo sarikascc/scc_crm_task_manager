@@ -1,7 +1,14 @@
-import { requireAuth } from '@/lib/auth/utils'
+import { requireAuth, hasPermission } from '@/lib/auth/utils'
+import { redirect } from 'next/navigation'
+import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
 
 export default async function SettingsPage() {
   const user = await requireAuth()
+  const canRead = await hasPermission(user, MODULE_PERMISSION_IDS.settings, 'read')
+
+  if (!canRead) {
+    redirect('/dashboard?error=unauthorized')
+  }
 
   return (
     <div className="rounded-lg bg-white p-12 shadow-sm">

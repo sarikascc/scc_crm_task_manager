@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { canReadModule, canWriteModule } from '@/lib/permissions'
 
 export async function getCurrentUser() {
   const supabase = await createClient()
@@ -73,21 +74,10 @@ export async function hasPermission(
   requiredLevel: 'read' | 'write'
 ): Promise<boolean> {
   if (!user) return false
-  if (user.role === 'admin') return true
+  const context = { role: user.role, modulePermissions: user.modulePermissions }
 
-  // Managers have access to most things, but we can refine this if needed
-  if (user.role === 'manager') {
-    // Manage users and system settings denial for manager as per requirement
-    if (module === 'users' || module === 'settings') return false
-    return true
-  }
-
-  const permission = user.modulePermissions[module]
-  if (!permission || permission === 'none') return false
-
-  if (requiredLevel === 'read') return permission === 'read' || permission === 'write'
-  if (requiredLevel === 'write') return permission === 'write'
+  if (requiredLevel === 'read') return canReadModule(context, module)
+  if (requiredLevel === 'write') return canWriteModule(context, module)
 
   return false
 }
-

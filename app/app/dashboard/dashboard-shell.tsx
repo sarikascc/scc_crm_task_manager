@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from '@/app/components/dashboard/sidebar';
 import { Header } from '@/app/components/dashboard/header';
+import type { ModulePermissions } from '@/lib/permissions';
 
 interface DashboardShellProps {
     children: React.ReactNode;
     userEmail?: string;
     userFullName?: string;
     userRole?: string;
+    modulePermissions?: ModulePermissions;
 }
 
 const SIDEBAR_STATE_KEY = 'sidebar-collapsed';
@@ -28,6 +30,7 @@ export function DashboardShell({
     userEmail,
     userFullName,
     userRole,
+    modulePermissions,
 }: DashboardShellProps) {
     const pathname = usePathname();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -69,6 +72,7 @@ export function DashboardShell({
                 userEmail={userEmail}
                 userFullName={userFullName}
                 userRole={userRole}
+                modulePermissions={modulePermissions}
             />
 
             <div className={`flex flex-1 flex-col overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[260px]'}`}>

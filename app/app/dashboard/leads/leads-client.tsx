@@ -23,11 +23,10 @@ type LeadListItem = {
 
 interface LeadsClientProps {
   leads: LeadListItem[]
-  currentUserId: string
-  userRole: string
+  canWrite: boolean
 }
 
-export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps) {
+export function LeadsClient({ leads, canWrite }: LeadsClientProps) {
   const router = useRouter()
   const { success: showSuccess, error: showError } = useToast()
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -168,6 +167,10 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
   }
 
   const handleCreate = async (formData: LeadFormData) => {
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to create leads.')
+      return { error: 'Permission denied' }
+    }
     setLoading(true)
     const result = await createLead(formData)
     setLoading(false)
@@ -182,6 +185,10 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
 
   const handleUpdate = async (formData: LeadFormData) => {
     if (!selectedLeadId) return { error: 'No lead selected' }
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to update leads.')
+      return { error: 'Permission denied' }
+    }
     setLoading(true)
     const result = await updateLead(selectedLeadId, formData)
     setLoading(false)
@@ -207,6 +214,10 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
   }
 
   const handleEdit = async (leadId: string) => {
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to edit leads.')
+      return
+    }
     setLoading(true)
     const result = await getLead(leadId)
     setLoading(false)
@@ -221,6 +232,10 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
 
   const handleEditFromDetails = () => {
     // Don't close details view, just open edit modal on top
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to edit leads.')
+      return
+    }
     if (selectedLeadId) {
       setEditModalOpen(true)
     }
@@ -242,6 +257,10 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
   }
 
   const handleDelete = (leadId: string, leadName: string) => {
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to delete leads.')
+      return
+    }
     setSelectedLeadId(leadId)
     setDeleteLeadName(leadName)
     setDeleteModalOpen(true)
@@ -249,6 +268,10 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
 
   const handleConfirmDelete = async () => {
     if (!selectedLeadId) return
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to delete leads.')
+      return
+    }
 
     setDeleting(true)
     const result = await deleteLead(selectedLeadId)
@@ -271,9 +294,7 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
     setDeleteLeadName('')
   }
 
-  const canEditLead = (lead: LeadListItem) => {
-    return userRole === 'admin' || lead.created_by === currentUserId
-  }
+  const canEditLead = () => canWrite
 
   const getInitialEditData = (): Partial<LeadFormData> | undefined => {
     if (!selectedLead) return undefined
@@ -302,7 +323,9 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
           <h1 className="text-2xl font-semibold text-[#1E1B4B]">Leads</h1>
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="btn-gradient-smooth rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2 active:translate-y-0 active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            disabled={!canWrite}
+            title={canWrite ? 'Create lead' : 'Read-only access'}
+            className={`btn-gradient-smooth rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2 active:translate-y-0 active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${!canWrite ? 'hover:shadow-lg hover:-translate-y-0' : ''}`}
           >
             Create Lead
           </button>
@@ -329,8 +352,7 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
           <div className="flex-1 overflow-y-auto">
             <LeadsTable
               leads={filteredAndSortedLeads}
-              currentUserId={currentUserId}
-              userRole={userRole}
+              canWrite={canWrite}
               onView={handleView}
               onEdit={handleEdit}
               onDelete={handleDelete}
@@ -367,10 +389,9 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
           onClose={handleCloseDetails}
           onEdit={handleEditFromDetails}
           onDelete={() => handleDelete(selectedLead.id, selectedLead.name)}
-          canEdit={canEditLead(selectedLead as LeadListItem)}
-          canDelete={canEditLead(selectedLead as LeadListItem)}
-          currentUserId={currentUserId}
-          userRole={userRole}
+          canEdit={canEditLead()}
+          canDelete={canEditLead()}
+          canWrite={canWrite}
         />
       )}
 
@@ -385,4 +406,3 @@ export function LeadsClient({ leads, currentUserId, userRole }: LeadsClientProps
     </>
   )
 }
-

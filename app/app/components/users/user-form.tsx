@@ -17,9 +17,10 @@ type UserFormProps = {
     mode: 'create' | 'edit'
     onSubmit: (data: any) => Promise<{ error?: string; success?: boolean }>
     onCancel: () => void
+    readOnly?: boolean
 }
 
-export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProps) {
+export function UserForm({ initialData, mode, onSubmit, onCancel, readOnly = false }: UserFormProps) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -45,11 +46,13 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
     }, [])
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        if (readOnly) return
         const { name, value } = e.target
         setFormData(prev => ({ ...prev, [name]: value }))
     }
 
     const handlePermissionChange = (moduleId: string, level: 'read' | 'write' | 'none') => {
+        if (readOnly) return
         setFormData(prev => ({
             ...prev,
             module_permissions: {
@@ -61,6 +64,7 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (readOnly) return
         setLoading(true)
         setError(null)
 
@@ -117,6 +121,7 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
                             onChange={handleChange}
                             placeholder="Alex Morgan"
                             className={inputClasses}
+                            disabled={readOnly}
                         />
                     </div>
 
@@ -127,7 +132,7 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
                             type="email"
                             name="email"
                             required
-                            disabled={mode === 'edit'}
+                            disabled={mode === 'edit' || readOnly}
                             value={formData.email}
                             onChange={handleChange}
                             placeholder="alex@example.com"
@@ -147,6 +152,7 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
                                 onChange={handleChange}
                                 placeholder="Set secure password"
                                 className={inputClasses}
+                                disabled={readOnly}
                             />
                         </div>
                     )}
@@ -161,7 +167,8 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
                                 name="role"
                                 value={formData.role}
                                 onChange={handleChange}
-                                className={`${inputClasses} appearance-none cursor-pointer`}
+                                disabled={readOnly}
+                                className={`${inputClasses} appearance-none cursor-pointer disabled:bg-slate-100 disabled:shadow-none disabled:text-slate-500 disabled:border-slate-200 disabled:cursor-not-allowed`}
                             >
                                 <option value="staff">Staff</option>
                                 <option value="client">Client</option>
@@ -183,14 +190,16 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
                             <button
                                 type="button"
                                 onClick={() => setFormData(p => ({ ...p, is_active: true }))}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.is_active ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                disabled={readOnly}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.is_active ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'} ${readOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
                             >
                                 Active
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setFormData(p => ({ ...p, is_active: false }))}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${!formData.is_active ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                disabled={readOnly}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${!formData.is_active ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'} ${readOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
                             >
                                 Inactive
                             </button>
@@ -218,10 +227,11 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
                                             key={level}
                                             type="button"
                                             onClick={() => handlePermissionChange(module.id, level)}
+                                            disabled={readOnly}
                                             className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${(formData.module_permissions[module.id] || 'none') === level
                                                     ? 'bg-white text-[#06B6D4] shadow-sm'
                                                     : 'text-slate-400 hover:text-slate-600'
-                                                }`}
+                                                } ${readOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
                                         >
                                             {level}
                                         </button>
@@ -243,8 +253,8 @@ export function UserForm({ initialData, mode, onSubmit, onCancel }: UserFormProp
                 </button>
                 <button
                     type="submit"
-                    disabled={loading}
-                    className="btn-gradient-smooth rounded-xl px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-[#06B6D4]/20 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-[#06B6D4]/20 disabled:opacity-50"
+                    disabled={loading || readOnly}
+                    className="btn-gradient-smooth rounded-xl px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-[#06B6D4]/20 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-[#06B6D4]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? 'Saving...' : mode === 'create' ? 'Create User' : 'Save Changes'}
                 </button>

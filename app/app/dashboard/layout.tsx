@@ -13,6 +13,7 @@ export default async function DashboardLayout({
             userEmail={user.email}
             userFullName={user.fullName}
             userRole={user.role}
+            modulePermissions={user.modulePermissions}
         >
             {children}
         </DashboardShell>

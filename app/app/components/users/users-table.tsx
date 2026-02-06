@@ -7,6 +7,7 @@ import { Tooltip } from '@/app/components/ui/tooltip'
 interface UsersTableProps {
     users: UserData[]
     currentUserId: string
+    canWrite: boolean
     onEdit: (user: UserData) => void
     onChangePassword: (user: UserData) => void
     onDelete: (user: UserData) => void
@@ -46,7 +47,7 @@ function RolePill({ role }: { role: string }) {
     )
 }
 
-export function UsersTable({ users, currentUserId, onEdit, onChangePassword, onDelete }: UsersTableProps) {
+export function UsersTable({ users, currentUserId, canWrite, onEdit, onChangePassword, onDelete }: UsersTableProps) {
     if (users.length === 0) {
         return (
             <div className="flex h-full w-full min-h-[500px] items-center justify-center bg-white">
@@ -79,7 +80,7 @@ export function UsersTable({ users, currentUserId, onEdit, onChangePassword, onD
                             Status
                         </th>
                         <th className="w-[18%] sm:w-[15%] px-4 sm:px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 transition-all duration-200">
-                            Actions
+                            {canWrite ? 'Actions' : 'View'}
                         </th>
                     </tr>
                 </thead>
@@ -111,37 +112,41 @@ export function UsersTable({ users, currentUserId, onEdit, onChangePassword, onD
                             </td>
                             <td className="px-4 sm:px-6 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-2">
-                                    <Tooltip content="Edit user profile" position="left">
-                                        <button
-                                            onClick={() => onEdit(user)}
-                                            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-                                        >
-                                            <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                        </button>
-                                    </Tooltip>
-                                    <Tooltip content="Reset account password" position="left">
-                                        <button
-                                            onClick={() => onChangePassword(user)}
-                                            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-cyan-50 hover:text-cyan-600"
-                                        >
-                                            <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                            </svg>
-                                        </button>
-                                    </Tooltip>
-                                    {user.id !== currentUserId && (
-                                        <Tooltip content="Deactivate user" position="left">
-                                            <button
-                                                onClick={() => onDelete(user)}
-                                                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                                            >
-                                                <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        </Tooltip>
+                                    {canWrite && (
+                                        <>
+                                            <Tooltip content="Edit user profile" position="left">
+                                                <button
+                                                    onClick={() => onEdit(user)}
+                                                    className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                                >
+                                                    <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </button>
+                                            </Tooltip>
+                                            <Tooltip content="Reset account password" position="left">
+                                                <button
+                                                    onClick={() => onChangePassword(user)}
+                                                    className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-cyan-50 hover:text-cyan-600"
+                                                >
+                                                    <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                                    </svg>
+                                                </button>
+                                            </Tooltip>
+                                            {user.id !== currentUserId && (
+                                                <Tooltip content="Deactivate user" position="left">
+                                                    <button
+                                                        onClick={() => onDelete(user)}
+                                                        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                                    >
+                                                        <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </Tooltip>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </td>

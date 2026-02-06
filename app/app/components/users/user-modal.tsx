@@ -9,6 +9,7 @@ interface UserModalProps {
     onClose: () => void
     mode: 'create' | 'edit'
     initialData?: UserData
+    readOnly?: boolean
     onSubmit: (data: any) => Promise<{ error?: string; success?: boolean }>
 }
 
@@ -17,6 +18,7 @@ export function UserModal({
     onClose,
     mode,
     initialData,
+    readOnly = false,
     onSubmit,
 }: UserModalProps) {
     useEffect(() => {
@@ -80,6 +82,7 @@ export function UserModal({
                         initialData={initialData}
                         onSubmit={onSubmit}
                         onCancel={onClose}
+                        readOnly={readOnly}
                     />
                 </div>
             </div>

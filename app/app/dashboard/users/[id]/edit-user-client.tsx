@@ -6,12 +6,16 @@ import { useRouter } from 'next/navigation'
 
 type EditUserClientProps = {
     user: UserData
+    readOnly?: boolean
 }
 
-export function EditUserClient({ user }: EditUserClientProps) {
+export function EditUserClient({ user, readOnly = false }: EditUserClientProps) {
     const router = useRouter()
 
     const handleSubmit = async (data: any) => {
+        if (readOnly) {
+            return { error: 'Read-only access', success: false }
+        }
         // Remove password if empty (though form handles this logic mostly, backend ignores it if not provided in update)
         const result = await updateUser(user.id, data)
         if (result.success) {
@@ -31,6 +35,7 @@ export function EditUserClient({ user }: EditUserClientProps) {
                         initialData={user}
                         onSubmit={handleSubmit}
                         onCancel={() => router.back()}
+                        readOnly={readOnly}
                     />
                 </div>
             </div>

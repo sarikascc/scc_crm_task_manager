@@ -11,17 +11,16 @@ import { DeleteConfirmModal } from '../delete-confirm-modal'
 
 interface LeadDetailViewProps {
   lead: Lead
-  currentUserId: string
-  userRole: string
+  canWrite: boolean
 }
 
 function StatusPill({ status }: { status: LeadStatus }) {
   const statusStyles = {
-    new: 'bg-cyan-100 text-cyan-800 border-cyan-200 hover:bg-cyan-200 hover:shadow-md',
-    contacted: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200 hover:shadow-md',
-    follow_up: 'bg-gradient-to-r from-[#06B6D4] to-[#0891b2] text-white border-[#0891b2] hover:shadow-lg',
-    converted: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200 hover:shadow-md',
-    lost: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200 hover:shadow-md',
+    new: 'bg-cyan-100 text-cyan-800 border-cyan-200 hover:bg-cyan-200',
+    contacted: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200',
+    follow_up: 'bg-gradient-to-r from-[#06B6D4] to-[#0891b2] text-white border-[#0891b2]',
+    converted: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200',
+    lost: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200',
   }
 
   const statusLabels = {
@@ -34,7 +33,7 @@ function StatusPill({ status }: { status: LeadStatus }) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-5 py-2 text-sm font-bold border-2 transition-all duration-200 ${statusStyles[status]}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border transition-all duration-200 ${statusStyles[status]}`}
     >
       {statusLabels[status]}
     </span>
@@ -71,8 +70,7 @@ function getInitials(name: string | null | undefined): string {
 
 export function LeadDetailView({
   lead: initialLead,
-  currentUserId,
-  userRole,
+  canWrite,
 }: LeadDetailViewProps) {
   const router = useRouter()
   const [lead, setLead] = useState<Lead>(initialLead)
@@ -82,8 +80,8 @@ export function LeadDetailView({
   const [deleting, setDeleting] = useState(false)
   const [mobileFollowUpsOpen, setMobileFollowUpsOpen] = useState(false)
 
-  const canEdit = userRole === 'admin' || lead.created_by === currentUserId
-  const canDelete = canEdit
+  const canEdit = canWrite
+  const canDelete = canWrite
 
   const handleBack = () => {
     router.push('/dashboard/leads')
@@ -147,7 +145,7 @@ export function LeadDetailView({
         <div className="w-full lg:w-1/2 flex flex-col gap-4 overflow-y-auto pb-24 lg:pb-0 scrollbar-hide">
 
           {/* Main Card */}
-          <div className="rounded-2xl bg-white shadow-xl border border-gray-100 relative">
+          <div className="rounded-2xl bg-white shadow-sm border border-slate-200 relative">
 
             {/* 1. Header Section */}
             <div className="relative bg-white border-b border-gray-100 p-6 rounded-t-2xl">
@@ -233,7 +231,7 @@ export function LeadDetailView({
             <div className="p-6 bg-slate-50/30 flex flex-col gap-4 rounded-b-2xl">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Phone */}
-                <div className="flex items-center gap-4 group p-4 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-cyan-100 transition-all cursor-pointer" onClick={() => window.location.href = `tel:${lead.phone}`}>
+                <div className="flex items-center gap-4 group p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-sm hover:border-cyan-100 transition-all cursor-pointer" onClick={() => window.location.href = `tel:${lead.phone}`}>
                   <div className="h-12 w-12 rounded-xl bg-cyan-50 flex items-center justify-center text-[#06B6D4] group-hover:bg-[#06B6D4] group-hover:text-white transition-colors shadow-sm">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -247,7 +245,7 @@ export function LeadDetailView({
 
                 {/* Source */}
                 {lead.source && (
-                  <div className="flex items-center gap-4 group p-4 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-orange-100 transition-all">
+                  <div className="flex items-center gap-4 group p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-sm hover:border-orange-100 transition-all">
                     <div className="h-12 w-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm">
                       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -296,7 +294,7 @@ export function LeadDetailView({
           </div>
 
           {/* 4. Notes Section */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 flex flex-col gap-3">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                 <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -325,9 +323,8 @@ export function LeadDetailView({
         <div className="hidden lg:flex w-1/2 h-full flex-col">
           <LeadFollowUps
             leadId={lead.id}
-            currentUserId={currentUserId}
-            userRole={userRole}
             leadFollowUpDate={lead.follow_up_date}
+            canWrite={canWrite}
           />
         </div>
 
@@ -401,9 +398,8 @@ export function LeadDetailView({
             <div className="flex-1 overflow-hidden">
               <LeadFollowUps
                 leadId={lead.id}
-                currentUserId={currentUserId}
-                userRole={userRole}
                 leadFollowUpDate={lead.follow_up_date}
+                canWrite={canWrite}
                 hideHeader={true}
                 className="!bg-transparent !shadow-none !border-none !p-0 !rounded-none h-full"
               />
@@ -442,4 +438,3 @@ export function LeadDetailView({
     </>
   )
 }
-

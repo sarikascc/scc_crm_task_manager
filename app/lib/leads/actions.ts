@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser, hasPermission } from '@/lib/auth/utils'
+import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
 
 export type LeadStatus = 'new' | 'contacted' | 'follow_up' | 'converted' | 'lost'
 
@@ -30,17 +32,20 @@ export type Lead = {
 }
 
 export async function createLead(formData: LeadFormData) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
     return {
       error: 'You must be logged in to create a lead',
     }
   }
+  const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'write')
+  if (!canWrite) {
+    return {
+      error: 'You do not have permission to create a lead',
+    }
+  }
+
+  const supabase = await createClient()
 
   // Validate required fields
   if (!formData.name || !formData.phone || !formData.status) {
@@ -59,7 +64,7 @@ export async function createLead(formData: LeadFormData) {
       status: formData.status,
       follow_up_date: formData.follow_up_date || null,
       notes: formData.notes || null,
-      created_by: user.id,
+      created_by: currentUser.id,
     })
     .select()
     .single()
@@ -84,44 +89,31 @@ export async function createLead(formData: LeadFormData) {
  * - If follow-up records exist, they will override this on next follow-up creation/update
  */
 export async function updateLead(leadId: string, formData: LeadFormData) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
     return {
       error: 'You must be logged in to update a lead',
     }
   }
+  const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'write')
+  if (!canWrite) {
+    return {
+      error: 'You do not have permission to update this lead',
+    }
+  }
 
-  // Check if user can edit this lead (RLS will handle this, but we check for better error messages)
+  const supabase = await createClient()
+
+  // Check if lead exists (RLS will handle access, but we check for better error messages)
   const { data: existingLead, error: fetchError } = await supabase
     .from('leads')
-    .select('created_by')
+    .select('id')
     .eq('id', leadId)
     .single()
 
   if (fetchError || !existingLead) {
     return {
       error: 'Lead not found',
-    }
-  }
-
-  // Check if user is admin or owns the lead
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const isAdmin = userData?.role === 'admin'
-  const isOwner = existingLead.created_by === user.id
-
-  if (!isAdmin && !isOwner) {
-    return {
-      error: 'You do not have permission to edit this lead',
     }
   }
 
@@ -162,18 +154,22 @@ export async function updateLead(leadId: string, formData: LeadFormData) {
 }
 
 export async function getLead(leadId: string): Promise<{ data: Lead | null; error: string | null }> {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
     return {
       error: 'You must be logged in to view a lead',
       data: null,
     }
   }
+  const canRead = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'read')
+  if (!canRead) {
+    return {
+      error: 'You do not have permission to view this lead',
+      data: null,
+    }
+  }
+
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('leads')
@@ -189,65 +185,35 @@ export async function getLead(leadId: string): Promise<{ data: Lead | null; erro
     }
   }
 
-  // Check permissions (RLS handles this, but we verify for better UX)
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const isAdmin = userData?.role === 'admin'
-  const isOwner = data.created_by === user.id
-
-  if (!isAdmin && !isOwner) {
-    return {
-      error: 'You do not have permission to view this lead',
-      data: null,
-    }
-  }
-
   return { data, error: null }
 }
 
 export async function deleteLead(leadId: string) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
     return {
       error: 'You must be logged in to delete a lead',
     }
   }
+  const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'write')
+  if (!canWrite) {
+    return {
+      error: 'You do not have permission to delete this lead',
+    }
+  }
 
-  // Check if user can delete this lead (RLS will handle this, but we check for better error messages)
+  const supabase = await createClient()
+
+  // Check if lead exists (RLS will handle access, but we check for better error messages)
   const { data: existingLead, error: fetchError } = await supabase
     .from('leads')
-    .select('created_by')
+    .select('id')
     .eq('id', leadId)
     .single()
 
   if (fetchError || !existingLead) {
     return {
       error: 'Lead not found',
-    }
-  }
-
-  // Check if user is admin or owns the lead
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const isAdmin = userData?.role === 'admin'
-  const isOwner = existingLead.created_by === user.id
-
-  if (!isAdmin && !isOwner) {
-    return {
-      error: 'You do not have permission to delete this lead',
     }
   }
 
@@ -276,18 +242,22 @@ export type LeadFollowUp = {
 }
 
 export async function getLeadFollowUps(leadId: string) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
     return {
       error: 'You must be logged in to view follow-ups',
       data: null,
     }
   }
+  const canRead = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'read')
+  if (!canRead) {
+    return {
+      error: 'You do not have permission to view follow-ups',
+      data: null,
+    }
+  }
+
+  const supabase = await createClient()
 
   // Fetch follow-ups for the lead, ordered by follow_up_date DESC
   // RLS will automatically filter based on user permissions
@@ -396,18 +366,22 @@ export async function createLeadFollowUp(
   leadId: string,
   formData: LeadFollowUpFormData
 ) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
     return {
       error: 'You must be logged in to create a follow-up',
       data: null,
     }
   }
+  const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'write')
+  if (!canWrite) {
+    return {
+      error: 'You do not have permission to create follow-ups',
+      data: null,
+    }
+  }
+
+  const supabase = await createClient()
 
   // Validate required fields
   if (!formData.follow_up_date || !formData.note?.trim()) {
@@ -425,7 +399,7 @@ export async function createLeadFollowUp(
       lead_id: leadId,
       note: formData.note.trim(),
       follow_up_date: formData.follow_up_date, // This is the NEXT follow-up date
-      created_by: user.id,
+      created_by: currentUser.id,
     })
     .select()
     .single()
@@ -449,46 +423,33 @@ export async function updateLeadFollowUp(
   followUpId: string,
   formData: LeadFollowUpFormData
 ) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
     return {
       error: 'You must be logged in to update a follow-up',
       data: null,
     }
   }
+  const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'write')
+  if (!canWrite) {
+    return {
+      error: 'You do not have permission to update follow-ups',
+      data: null,
+    }
+  }
 
-  // Check if user can edit this follow-up (RLS will handle this, but we check for better error messages)
+  const supabase = await createClient()
+
+  // Check if follow-up exists (RLS will handle access, but we check for better error messages)
   const { data: existingFollowUp, error: fetchError } = await supabase
     .from('lead_followups')
-    .select('created_by, lead_id')
+    .select('lead_id')
     .eq('id', followUpId)
     .single()
 
   if (fetchError || !existingFollowUp) {
     return {
       error: 'Follow-up not found',
-      data: null,
-    }
-  }
-
-  // Check if user is admin or owns the follow-up
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const isAdmin = userData?.role === 'admin'
-  const isOwner = existingFollowUp.created_by === user.id
-
-  if (!isAdmin && !isOwner) {
-    return {
-      error: 'You do not have permission to edit this follow-up',
       data: null,
     }
   }
@@ -536,44 +497,31 @@ export async function updateLeadFollowUp(
  * - Uses latest remaining follow-up date, or null if none exist
  */
 export async function deleteLeadFollowUp(followUpId: string) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
     return {
       error: 'You must be logged in to delete a follow-up',
     }
   }
+  const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'write')
+  if (!canWrite) {
+    return {
+      error: 'You do not have permission to delete follow-ups',
+    }
+  }
 
-  // Check if user can delete this follow-up (RLS will handle this, but we check for better error messages)
+  const supabase = await createClient()
+
+  // Check if follow-up exists (RLS will handle access, but we check for better error messages)
   const { data: existingFollowUp, error: fetchError } = await supabase
     .from('lead_followups')
-    .select('created_by, lead_id')
+    .select('lead_id')
     .eq('id', followUpId)
     .single()
 
   if (fetchError || !existingFollowUp) {
     return {
       error: 'Follow-up not found',
-    }
-  }
-
-  // Check if user is admin or owns the follow-up
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const isAdmin = userData?.role === 'admin'
-  const isOwner = existingFollowUp.created_by === user.id
-
-  if (!isAdmin && !isOwner) {
-    return {
-      error: 'You do not have permission to delete this follow-up',
     }
   }
 
@@ -597,4 +545,3 @@ export async function deleteLeadFollowUp(followUpId: string) {
   revalidatePath('/dashboard/leads')
   return { error: null }
 }
-

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { logout } from '@/lib/auth/actions'
+import { canReadModule, MODULE_PERMISSION_IDS, ModulePermissions } from '@/lib/permissions'
 
 interface SidebarProps {
   isMobileOpen: boolean
@@ -13,16 +14,17 @@ interface SidebarProps {
   userEmail?: string
   userFullName?: string
   userRole?: string
+  modulePermissions?: ModulePermissions
 }
 
 const menuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: DashboardIcon },
-  { name: 'Leads', href: '/dashboard/leads', icon: LeadsIcon },
-  { name: 'Clients', href: '/dashboard/clients', icon: ClientsIcon },
-  { name: 'Projects', href: '/dashboard/projects', icon: ProjectsIcon },
-  { name: 'Users', href: '/dashboard/users', icon: UsersIcon },
-  { name: 'Logs', href: '/dashboard/logs', icon: LogsIcon },
-  { name: 'Settings', href: '/dashboard/settings', icon: SettingsIcon },
+  { name: 'Leads', href: '/dashboard/leads', icon: LeadsIcon, moduleId: MODULE_PERMISSION_IDS.leads },
+  { name: 'Clients', href: '/dashboard/clients', icon: ClientsIcon, moduleId: MODULE_PERMISSION_IDS.clients },
+  { name: 'Projects', href: '/dashboard/projects', icon: ProjectsIcon, moduleId: MODULE_PERMISSION_IDS.projects },
+  { name: 'Users', href: '/dashboard/users', icon: UsersIcon, moduleId: MODULE_PERMISSION_IDS.users },
+  { name: 'Logs', href: '/dashboard/logs', icon: LogsIcon, moduleId: MODULE_PERMISSION_IDS.logs },
+  { name: 'Settings', href: '/dashboard/settings', icon: SettingsIcon, moduleId: MODULE_PERMISSION_IDS.settings },
 ]
 
 function DashboardIcon() {
@@ -90,6 +92,7 @@ export function Sidebar({
   userEmail,
   userFullName,
   userRole,
+  modulePermissions,
 }: SidebarProps) {
   const pathname = usePathname()
   const [isProfileExpanded, setIsProfileExpanded] = useState(false)
@@ -195,9 +198,8 @@ export function Sidebar({
           <nav className={`flex-1 overflow-y-auto transition-all duration-300 ${isCollapsed ? 'px-2 py-4' : 'px-4 py-6'} scrollbar-hide`}>
             <ul className="space-y-2">
               {menuItems.filter(item => {
-                if (item.name === 'Users') return userRole === 'admin'
-                if (item.name === 'Settings' && userRole === 'manager') return false
-                return true
+                if (!item.moduleId) return true
+                return canReadModule({ role: userRole, modulePermissions }, item.moduleId)
               }).map((item) => {
                 // More precise active state: exact match or starts with the href followed by /
                 // Special handling for /dashboard to only match exactly
@@ -458,4 +460,3 @@ export function Sidebar({
     </>
   )
 }
-

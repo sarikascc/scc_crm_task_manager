@@ -2,8 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { Database } from '@/types/supabase'
+import { getCurrentUser, hasPermission } from '@/lib/auth/utils'
+import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export type UserRole = Database['public']['Enums']['user_role']
 export type ModulePermissions = Record<string, 'read' | 'write' | 'none'>
@@ -36,6 +38,17 @@ export type UpdateUserFormData = {
 }
 
 export async function getUsers(filters?: { search?: string; role?: string; status?: string }) {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        return { error: 'You must be logged in to view users' }
+    }
+
+    const canRead = await hasPermission(currentUser, MODULE_PERMISSION_IDS.users, 'read')
+    if (!canRead) {
+        return { error: 'You do not have permission to view users' }
+    }
+
     const supabase = await createClient()
 
     let query = (supabase
@@ -67,6 +80,17 @@ export async function getUsers(filters?: { search?: string; role?: string; statu
 }
 
 export async function getUser(id: string) {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        return { error: 'You must be logged in to view users' }
+    }
+
+    const canRead = await hasPermission(currentUser, MODULE_PERMISSION_IDS.users, 'read')
+    if (!canRead) {
+        return { error: 'You do not have permission to view users' }
+    }
+
     const supabase = await createClient()
 
     const { data: user, error } = await (supabase
@@ -84,12 +108,17 @@ export async function getUser(id: string) {
     return { data: user as UserData }
 }
 
-import { createAdminClient } from '@/lib/supabase/admin'
-import { requireRole } from '@/lib/auth/utils'
-
 export async function createUser(formData: CreateUserFormData) {
-    // Security check
-    await requireRole(['admin'])
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        return { error: 'You must be logged in to create users' }
+    }
+
+    const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.users, 'write')
+    if (!canWrite) {
+        return { error: 'You do not have permission to create users' }
+    }
 
     const supabaseAdmin = createAdminClient()
 
@@ -140,8 +169,17 @@ export async function createUser(formData: CreateUserFormData) {
 }
 
 export async function updateUser(id: string, formData: UpdateUserFormData) {
-    await requireRole(['admin'])
-    const supabase = await createClient()
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        return { error: 'You must be logged in to update users' }
+    }
+
+    const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.users, 'write')
+    if (!canWrite) {
+        return { error: 'You do not have permission to update users' }
+    }
+    const supabaseAdmin = createAdminClient()
 
     const updates: any = {
         ...formData,
@@ -151,7 +189,7 @@ export async function updateUser(id: string, formData: UpdateUserFormData) {
     // Remove password from direct update to `users` table (it's in auth)
     delete updates.password
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
         .from('users')
         .update(updates as any)
         .eq('id', id)
@@ -177,7 +215,16 @@ export async function updateUser(id: string, formData: UpdateUserFormData) {
 }
 
 export async function deleteUser(id: string) {
-    await requireRole(['admin'])
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        return { error: 'You must be logged in to delete users' }
+    }
+
+    const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.users, 'write')
+    if (!canWrite) {
+        return { error: 'You do not have permission to delete users' }
+    }
     const supabaseAdmin = createAdminClient()
 
     // Soft delete: set deleted_at and is_active to false
@@ -202,7 +249,16 @@ export async function deleteUser(id: string) {
     return { success: true }
 }
 export async function changeUserPassword(userId: string, password: string) {
-    await requireRole(['admin'])
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        return { error: 'You must be logged in to change passwords' }
+    }
+
+    const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.users, 'write')
+    if (!canWrite) {
+        return { error: 'You do not have permission to change passwords' }
+    }
     const supabaseAdmin = createAdminClient()
 
     const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
+import type { ModulePermissions } from '@/lib/permissions'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -11,6 +12,7 @@ interface DashboardLayoutProps {
   userEmail?: string
   userFullName?: string
   userRole?: string
+  modulePermissions?: ModulePermissions
   hideHeader?: boolean
 }
 
@@ -36,6 +38,7 @@ export function DashboardLayout({
   userEmail,
   userFullName,
   userRole,
+  modulePermissions,
   hideHeader = false,
 }: DashboardLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -76,6 +79,7 @@ export function DashboardLayout({
         userEmail={userEmail}
         userFullName={userFullName}
         userRole={userRole}
+        modulePermissions={modulePermissions}
       />
 
       {/* Main Content Area */}
@@ -100,4 +104,3 @@ export function DashboardLayout({
     </div>
   )
 }
-

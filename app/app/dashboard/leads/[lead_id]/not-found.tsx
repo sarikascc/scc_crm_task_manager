@@ -11,6 +11,7 @@ export default async function LeadNotFound() {
       userEmail={user.email}
       userFullName={user.fullName}
       userRole={user.role}
+      modulePermissions={user.modulePermissions}
     >
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
@@ -59,5 +60,4 @@ export default async function LeadNotFound() {
     </DashboardLayout>
   )
 }
-
 

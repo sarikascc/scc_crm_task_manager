@@ -17,8 +17,7 @@ type SortDirection = 'asc' | 'desc' | null
 
 interface LeadsTableProps {
   leads: Lead[]
-  currentUserId?: string
-  userRole?: string
+  canWrite: boolean
   onView: (leadId: string) => void
   onEdit: (leadId: string) => void
   onDelete: (leadId: string, leadName: string) => void
@@ -124,8 +123,7 @@ function SortIcon({ direction }: { direction: 'asc' | 'desc' | null }) {
 
 export function LeadsTable({
   leads,
-  currentUserId,
-  userRole,
+  canWrite,
   onView,
   onEdit,
   onDelete,
@@ -229,15 +227,14 @@ export function LeadsTable({
               </div>
             </th>
             <th className="w-[15%] sm:w-[12%] px-4 sm:px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 transition-all duration-200">
-              Actions
+              {canWrite ? 'Actions' : 'View'}
             </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50 bg-white">
           {leads.map((lead) => {
-            const canEdit =
-              userRole === 'admin' || lead.created_by === currentUserId
-            const canDelete = canEdit
+            const canEdit = canWrite
+            const canDelete = canWrite
 
             return (
               <tr

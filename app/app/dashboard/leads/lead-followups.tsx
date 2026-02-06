@@ -19,9 +19,8 @@ import { useToast } from '@/app/components/ui/toast-context'
 
 interface LeadFollowUpsProps {
   leadId: string
-  currentUserId: string
-  userRole: string
   leadFollowUpDate?: string | null
+  canWrite: boolean
   className?: string
   hideHeader?: boolean
 }
@@ -101,9 +100,8 @@ function getInitials(name: string | null | undefined): string {
 
 export function LeadFollowUps({
   leadId,
-  currentUserId,
-  userRole,
   leadFollowUpDate,
+  canWrite,
   className = '',
   hideHeader = false,
 }: LeadFollowUpsProps) {
@@ -141,11 +139,11 @@ export function LeadFollowUps({
     fetchFollowUps()
   }, [leadId])
 
-  const canEditFollowUp = (followUp: LeadFollowUp) => {
-    return userRole === 'admin' || followUp.created_by === currentUserId
-  }
-
   const handleCreate = async (formData: LeadFollowUpFormData) => {
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to add follow-ups.')
+      return { error: 'Permission denied' }
+    }
     setSubmitting(true)
     const result = await createLeadFollowUp(leadId, formData)
     setSubmitting(false)
@@ -172,6 +170,10 @@ export function LeadFollowUps({
 
   const handleUpdate = async (formData: LeadFollowUpFormData) => {
     if (!selectedFollowUp) return { error: 'No follow-up selected' }
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to update follow-ups.')
+      return { error: 'Permission denied' }
+    }
 
     setSubmitting(true)
     const result = await updateLeadFollowUp(selectedFollowUp.id, formData)
@@ -190,12 +192,20 @@ export function LeadFollowUps({
   }
 
   const handleDelete = (followUp: LeadFollowUp) => {
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to delete follow-ups.')
+      return
+    }
     setSelectedFollowUp(followUp)
     setDeleteModalOpen(true)
   }
 
   const handleConfirmDelete = async () => {
     if (!selectedFollowUp) return
+    if (!canWrite) {
+      showError('Read-only Access', 'You do not have permission to delete follow-ups.')
+      return
+    }
 
     setDeleting(true)
     const result = await deleteLeadFollowUp(selectedFollowUp.id)
@@ -282,7 +292,7 @@ export function LeadFollowUps({
 
   return (
     <>
-      <div className={`h-full flex flex-col bg-white/40 backdrop-blur-md rounded-2xl border border-white shadow-xl shadow-slate-200/50 ${className}`}>
+      <div className={`h-full flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm ${className}`}>
 
         {/* Header Section */}
         {!hideHeader && (
@@ -324,7 +334,7 @@ export function LeadFollowUps({
           ) : (
             <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-cyan-500/20 before:via-cyan-500/10 before:to-transparent">
               {followUps.map((followUp, index) => {
-                const canEdit = canEditFollowUp(followUp)
+                const canEdit = canWrite
                 return (
                   <div key={followUp.id} className={`relative pl-12 animate-stagger-${Math.min(index + 1, 5)}`}>
                     {/* Timeline Dot */}
@@ -403,72 +413,78 @@ export function LeadFollowUps({
 
         {/* Quick Add Form Section */}
         <div className="p-5 border-t border-slate-100 bg-white/60 rounded-b-2xl">
-          <form
-            id="add-followup-form"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              const formData = new FormData(e.currentTarget)
-              const followUpData: LeadFollowUpFormData = {
-                follow_up_date: formData.get('follow_up_date') as string,
-                note: formData.get('note') as string,
-              }
-              await handleCreate(followUpData)
-            }}
-            className="space-y-4"
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
-              <div className="sm:col-span-12">
-                <div className="relative group">
-                  <textarea
-                    name="note"
-                    required
-                    placeholder="Briefly describe the interaction..."
-                    rows={2}
-                    className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 placeholder-slate-400 shadow-sm transition-all duration-300 focus:border-cyan-500 focus:outline-none focus:ring-4 focus:ring-cyan-500/10 resize-none group-hover:border-slate-300"
-                  ></textarea>
-                </div>
-              </div>
-
-              <div className="sm:col-span-8">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+          {canWrite ? (
+            <form
+              id="add-followup-form"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                const followUpData: LeadFollowUpFormData = {
+                  follow_up_date: formData.get('follow_up_date') as string,
+                  note: formData.get('note') as string,
+                }
+                await handleCreate(followUpData)
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+                <div className="sm:col-span-12">
+                  <div className="relative group">
+                    <textarea
+                      name="note"
+                      required
+                      placeholder="Briefly describe the interaction..."
+                      rows={2}
+                      className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 placeholder-slate-400 shadow-sm transition-all duration-300 focus:border-cyan-500 focus:outline-none focus:ring-4 focus:ring-cyan-500/10 resize-none group-hover:border-slate-300"
+                    ></textarea>
                   </div>
-                  <input
-                    type="date"
-                    name="follow_up_date"
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-2.5 pl-11 text-xs font-bold text-slate-700 shadow-sm transition-all duration-300 focus:border-cyan-500 focus:outline-none focus:ring-4 focus:ring-cyan-500/10"
-                  />
-                  <div className="absolute -top-2.5 left-4 px-1 bg-white text-[10px] font-bold text-cyan-600 uppercase tracking-widest border border-cyan-50 rounded">Set Reminder</div>
+                </div>
+
+                <div className="sm:col-span-8">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="date"
+                      name="follow_up_date"
+                      required
+                      className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-2.5 pl-11 text-xs font-bold text-slate-700 shadow-sm transition-all duration-300 focus:border-cyan-500 focus:outline-none focus:ring-4 focus:ring-cyan-500/10"
+                    />
+                    <div className="absolute -top-2.5 left-4 px-1 bg-white text-[10px] font-bold text-cyan-600 uppercase tracking-widest border border-cyan-50 rounded">Set Reminder</div>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-4 h-full">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full h-[41px] btn-gradient-smooth rounded-xl flex items-center justify-center gap-2 font-bold text-white shadow-lg shadow-cyan-500/20 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:active:scale-100"
+                  >
+                    {submitting ? (
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    ) : (
+                      <>
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-sm">Log Note</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
-
-              <div className="sm:col-span-4 h-full">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full h-[41px] btn-gradient-smooth rounded-xl flex items-center justify-center gap-2 font-bold text-white shadow-lg shadow-cyan-500/20 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:active:scale-100"
-                >
-                  {submitting ? (
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : (
-                    <>
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-sm">Log Note</span>
-                    </>
-                  )}
-                </button>
-              </div>
+            </form>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 text-center text-sm font-medium text-slate-500">
+              Read-only access. You can view follow-ups but cannot add or edit them.
             </div>
-          </form>
+          )}
         </div>
       </div>
 
@@ -497,4 +513,3 @@ export function LeadFollowUps({
     </>
   )
 }
-
