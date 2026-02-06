@@ -233,8 +233,8 @@ export async function deleteLead(leadId: string) {
 export type LeadFollowUp = {
   id: string
   lead_id: string
-  note: string
-  follow_up_date: string
+  note: string | null
+  follow_up_date: string | null
   created_by: string
   created_by_name: string | null
   created_at: string
@@ -259,13 +259,13 @@ export async function getLeadFollowUps(leadId: string) {
 
   const supabase = await createClient()
 
-  // Fetch follow-ups for the lead, ordered by follow_up_date DESC
+  // Fetch follow-ups for the lead, ordered by created_at ASC (oldest first, newest last)
   // RLS will automatically filter based on user permissions
   const { data: followUps, error } = await supabase
     .from('lead_followups')
     .select('*')
     .eq('lead_id', leadId)
-    .order('follow_up_date', { ascending: false })
+    .order('created_at', { ascending: true })
 
   if (error) {
     console.error('Error fetching follow-ups:', error)
@@ -308,8 +308,8 @@ export async function getLeadFollowUps(leadId: string) {
 }
 
 export type LeadFollowUpFormData = {
-  follow_up_date: string
-  note: string
+  follow_up_date?: string
+  note?: string
 }
 
 /**
@@ -331,13 +331,27 @@ async function updateLeadFollowUpDate(leadId: string) {
   today.setHours(0, 0, 0, 0)
   const todayDateString = today.toISOString().split('T')[0]
 
-  const { data: upcomingFollowUps } = await supabase
+  // Query all follow-ups with reminder dates (including past dates for completeness)
+  // Then filter for upcoming dates (today or future) to find the next one
+  const { data: allFollowUps, error: fetchError } = await supabase
     .from('lead_followups')
     .select('follow_up_date')
     .eq('lead_id', leadId)
-    .gte('follow_up_date', todayDateString)
+    .not('follow_up_date', 'is', null)
     .order('follow_up_date', { ascending: true })
-    .limit(1)
+
+  if (fetchError) {
+    console.error('Error fetching follow-ups for date sync:', fetchError)
+    return
+  }
+
+  // Filter for upcoming dates (today or future) and get the earliest one
+  const upcomingFollowUps = (allFollowUps || []).filter((fu) => {
+    if (!fu.follow_up_date) return false
+    const followUpDate = new Date(fu.follow_up_date)
+    followUpDate.setHours(0, 0, 0, 0)
+    return followUpDate >= today
+  })
 
   // Convert DATE to TIMESTAMP WITH TIME ZONE for leads table
   // Set to the earliest upcoming date, or null if none exist
@@ -347,10 +361,14 @@ async function updateLeadFollowUpDate(leadId: string) {
       : null
 
   // Update the lead's follow_up_date to keep it synchronized
-  await supabase
+  const { error: updateError } = await supabase
     .from('leads')
     .update({ follow_up_date: nextFollowUpDate })
     .eq('id', leadId)
+
+  if (updateError) {
+    console.error('Error updating lead follow-up date:', updateError)
+  }
 }
 
 /**
@@ -383,22 +401,23 @@ export async function createLeadFollowUp(
 
   const supabase = await createClient()
 
-  // Validate required fields
-  if (!formData.follow_up_date || !formData.note?.trim()) {
+  // Validate: at least one of note or follow_up_date must be provided
+  if (!formData.note?.trim() && !formData.follow_up_date) {
     return {
-      error: 'Follow-up note and next follow-up date are required',
+      error: 'Please add a note or set a reminder date (at least one is required)',
       data: null,
     }
   }
 
   // Insert follow-up record
   // Note: follow_up_date here is the NEXT follow-up date (not when the note was written)
+  // Both note and follow_up_date are optional, but at least one must be provided
   const { data, error } = await supabase
     .from('lead_followups')
     .insert({
       lead_id: leadId,
-      note: formData.note.trim(),
-      follow_up_date: formData.follow_up_date, // This is the NEXT follow-up date
+      note: formData.note?.trim() || null,
+      follow_up_date: formData.follow_up_date || null, // Optional: This is the NEXT follow-up date
       created_by: currentUser.id,
     })
     .select()
@@ -454,10 +473,10 @@ export async function updateLeadFollowUp(
     }
   }
 
-  // Validate required fields
-  if (!formData.follow_up_date || !formData.note?.trim()) {
+  // Validate: at least one of note or follow_up_date must be provided
+  if (!formData.note?.trim() && !formData.follow_up_date) {
     return {
-      error: 'Follow-up date and note are required',
+      error: 'Please add a note or set a reminder date (at least one is required)',
       data: null,
     }
   }
@@ -466,8 +485,8 @@ export async function updateLeadFollowUp(
   const { data, error } = await supabase
     .from('lead_followups')
     .update({
-      note: formData.note.trim(),
-      follow_up_date: formData.follow_up_date,
+      note: formData.note?.trim() || null,
+      follow_up_date: formData.follow_up_date || null,
     })
     .eq('id', followUpId)
     .select()

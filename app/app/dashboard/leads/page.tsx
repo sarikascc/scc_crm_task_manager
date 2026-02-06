@@ -29,12 +29,14 @@ export default async function LeadsPage() {
   }
 
   const canWrite = await hasPermission(user, MODULE_PERMISSION_IDS.leads, 'write')
+  const canCreateClient = await hasPermission(user, MODULE_PERMISSION_IDS.clients, 'write')
   const leads = await getLeads()
 
   return (
     <LeadsClient
       leads={leads}
       canWrite={canWrite}
+      canCreateClient={canCreateClient}
     />
   )
 }

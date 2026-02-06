@@ -8,7 +8,9 @@ import { LeadDetails } from './lead-details'
 import { DeleteConfirmModal } from './delete-confirm-modal'
 import { LeadsFilters } from './leads-filters'
 import { createLead, updateLead, getLead, deleteLead, LeadFormData, Lead, LeadStatus } from '@/lib/leads/actions'
+import { createClient, ClientFormData } from '@/lib/clients/actions'
 import { useToast } from '@/app/components/ui/toast-context'
+import { ClientModal } from '../clients/client-modal'
 
 type LeadListItem = {
   id: string
@@ -24,15 +26,18 @@ type LeadListItem = {
 interface LeadsClientProps {
   leads: LeadListItem[]
   canWrite: boolean
+  canCreateClient?: boolean
 }
 
-export function LeadsClient({ leads, canWrite }: LeadsClientProps) {
+export function LeadsClient({ leads, canWrite, canCreateClient = false }: LeadsClientProps) {
   const router = useRouter()
   const { success: showSuccess, error: showError } = useToast()
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [convertModalOpen, setConvertModalOpen] = useState(false)
+  const [leadToConvert, setLeadToConvert] = useState<Lead | null>(null)
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [deleteLeadName, setDeleteLeadName] = useState<string>('')
@@ -315,6 +320,61 @@ export function LeadsClient({ leads, canWrite }: LeadsClientProps) {
     setFollowUpDateFilter('all')
   }
 
+  const handleConvert = async (leadId: string) => {
+    if (!canCreateClient) {
+      showError('Permission Denied', 'You do not have permission to create clients.')
+      return
+    }
+    setLoading(true)
+    const result = await getLead(leadId)
+    setLoading(false)
+    if (result.data) {
+      setLeadToConvert(result.data)
+      setConvertModalOpen(true)
+    } else {
+      showError('Error', result.error || 'Failed to load lead for conversion')
+    }
+  }
+
+  const handleConvertSubmit = async (formData: ClientFormData) => {
+    if (!leadToConvert) return { error: 'No lead selected' }
+    if (!canCreateClient) {
+      showError('Permission Denied', 'You do not have permission to create clients.')
+      return { error: 'Permission denied' }
+    }
+    setLoading(true)
+    const result = await createClient({
+      ...formData,
+      lead_id: leadToConvert.id,
+    })
+    setLoading(false)
+    if (!result.error) {
+      showSuccess('Client Created', `Lead ${leadToConvert.name} has been converted to a client.`)
+      setConvertModalOpen(false)
+      setLeadToConvert(null)
+      router.refresh()
+      // Optionally update lead status to 'converted'
+      await updateLead(leadToConvert.id, {
+        ...leadToConvert,
+        status: 'converted',
+      })
+    } else {
+      showError('Conversion Failed', result.error)
+    }
+    return result
+  }
+
+  const getInitialConvertData = (): Partial<ClientFormData> | undefined => {
+    if (!leadToConvert) return undefined
+    return {
+      name: leadToConvert.name,
+      company_name: leadToConvert.company_name || undefined,
+      phone: leadToConvert.phone,
+      status: 'active',
+      lead_id: leadToConvert.id,
+    }
+  }
+
   return (
     <>
       <div className="flex h-full flex-col p-4 lg:p-6">
@@ -356,6 +416,8 @@ export function LeadsClient({ leads, canWrite }: LeadsClientProps) {
               onView={handleView}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onConvert={handleConvert}
+              canConvert={canCreateClient}
               sortField={sortField}
               sortDirection={sortField ? sortDirection : undefined}
               onSort={handleSort}
@@ -403,6 +465,20 @@ export function LeadsClient({ leads, canWrite }: LeadsClientProps) {
         leadName={deleteLeadName}
         isLoading={deleting}
       />
+
+      {/* Convert to Client Modal */}
+      {leadToConvert && (
+        <ClientModal
+          isOpen={convertModalOpen}
+          onClose={() => {
+            setConvertModalOpen(false)
+            setLeadToConvert(null)
+          }}
+          mode="create"
+          initialData={getInitialConvertData()}
+          onSubmit={handleConvertSubmit}
+        />
+      )}
     </>
   )
 }

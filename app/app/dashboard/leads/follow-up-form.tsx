@@ -19,8 +19,8 @@ export function FollowUpForm({
   const [state, formAction, isPending] = useActionState(
     async (_prevState: { error: string | null } | null, formData: FormData) => {
       const followUpData: LeadFollowUpFormData = {
-        follow_up_date: formData.get('follow_up_date') as string,
-        note: formData.get('note') as string,
+        follow_up_date: (formData.get('follow_up_date') as string) || undefined,
+        note: (formData.get('note') as string) || undefined,
       }
 
       const result = await onSubmit(followUpData)
@@ -43,15 +43,14 @@ export function FollowUpForm({
       {/* Note - What happened in this follow-up */}
       <div>
         <label htmlFor="note" className="block text-sm font-semibold text-[#1E1B4B] mb-2">
-          Follow-Up Note <span className="text-red-500">*</span>
+          Follow-Up Note (Optional)
         </label>
         <p className="text-xs text-gray-500 mb-2">
-          Describe what was discussed or what action was taken during this follow-up
+          Describe what was discussed or what action was taken during this follow-up. You can add a note or set a reminder date (at least one is required).
         </p>
         <textarea
           id="note"
           name="note"
-          required
           rows={6}
           defaultValue={initialData?.note || ''}
           className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[#1E1B4B] placeholder-gray-400 shadow-sm transition-all duration-200 focus:border-[#06B6D4] focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-opacity-20 sm:text-sm resize-none"
@@ -59,22 +58,21 @@ export function FollowUpForm({
         />
       </div>
 
-      {/* Next Follow-Up Date - The future date decided during this follow-up */}
+      {/* Next Follow-Up Date - The future date decided during this follow-up (Optional) */}
       <div>
         <label
           htmlFor="follow_up_date"
           className="block text-sm font-semibold text-[#1E1B4B] mb-2"
         >
-          Next Follow-Up Date <span className="text-red-500">*</span>
+          Set Reminder (Optional)
         </label>
         <p className="text-xs text-gray-500 mb-2">
-          The date when the next follow-up should be scheduled (decided during this follow-up)
+          Optionally set a date for the next follow-up reminder
         </p>
         <input
           type="date"
           id="follow_up_date"
           name="follow_up_date"
-          required
           defaultValue={
             initialData?.follow_up_date
               ? new Date(initialData.follow_up_date).toISOString().slice(0, 10)

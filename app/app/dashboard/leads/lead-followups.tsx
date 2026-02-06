@@ -65,7 +65,9 @@ function formatDateOnly(dateString: string) {
   })
 }
 
-function getFollowUpDateColor(dateString: string): string {
+function getFollowUpDateColor(dateString: string | null): string {
+  if (!dateString) return 'text-gray-500'
+  
   const followUpDate = new Date(dateString)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -230,8 +232,8 @@ export function LeadFollowUps({
   const getInitialEditData = (): Partial<LeadFollowUpFormData> | undefined => {
     if (!selectedFollowUp) return undefined
     return {
-      follow_up_date: selectedFollowUp.follow_up_date,
-      note: selectedFollowUp.note,
+      follow_up_date: selectedFollowUp.follow_up_date || undefined,
+      note: selectedFollowUp.note || undefined,
     }
   }
 
@@ -320,7 +322,7 @@ export function LeadFollowUps({
         )}
 
         {/* Scrollable Timeline */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 scrollbar-hide">
           {followUps.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <div className="w-full max-w-[280px]">
@@ -332,7 +334,7 @@ export function LeadFollowUps({
               </div>
             </div>
           ) : (
-            <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-cyan-500/20 before:via-cyan-500/10 before:to-transparent">
+            <div className="relative space-y-3 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-cyan-500/20 before:via-cyan-500/10 before:to-transparent">
               {followUps.map((followUp, index) => {
                 const canEdit = canWrite
                 return (
@@ -342,31 +344,31 @@ export function LeadFollowUps({
                       <div className="h-3 w-3 rounded-full bg-white border-2 border-cyan-500 shadow-[0_0_0_4px_rgba(6,182,212,0.1)]"></div>
                     </div>
 
-                    <div className="group bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-xl hover:border-cyan-100 transition-all duration-300 transform hover:-translate-y-1">
+                    <div className="bg-white rounded-xl border border-slate-100 p-3 shadow-sm">
                       {/* Interaction Header */}
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center border-2 border-white shadow-sm font-bold text-slate-600 text-xs">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center border-2 border-white shadow-sm font-bold text-slate-600 text-xs">
                             {getInitials(followUp.created_by_name)}
                           </div>
                           <div>
-                            <p className="text-sm font-extrabold text-slate-800 leading-none mb-1 font-['Plus_Jakarta_Sans',sans-serif]">
+                            <p className="text-xs font-extrabold text-slate-800 leading-none mb-0.5 font-['Plus_Jakarta_Sans',sans-serif]">
                               {followUp.created_by_name || 'System'}
                             </p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
                               {getRelativeTime(followUp.created_at)}
                             </p>
                           </div>
                         </div>
 
                         {canEdit && (
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-1">
                             <Tooltip content="Edit interaction">
                               <button
                                 onClick={() => handleEdit(followUp)}
-                                className="p-1.5 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors border border-transparent hover:border-cyan-100"
+                                className="p-1 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors border border-transparent hover:border-cyan-100"
                               >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
                               </button>
@@ -374,9 +376,9 @@ export function LeadFollowUps({
                             <Tooltip content="Delete record">
                               <button
                                 onClick={() => handleDelete(followUp)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
                               >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
@@ -386,23 +388,33 @@ export function LeadFollowUps({
                       </div>
 
                       {/* Content */}
-                      <div className="relative">
-                        <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
-                          {followUp.note}
-                        </p>
-                      </div>
+                      {followUp.note ? (
+                        <div className="relative">
+                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
+                            {followUp.note}
+                          </p>
+                        </div>
+                      ) : followUp.follow_up_date ? (
+                        <div className="relative">
+                          <p className="text-xs text-slate-500 italic">
+                            Reminder set (no interaction note)
+                          </p>
+                        </div>
+                      ) : null}
 
                       {/* Footer: Date Reminder */}
-                      <div className="mt-4 pt-4 border-t border-slate-50 flex items-center gap-2">
-                        <div className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-100 inline-flex items-center gap-1.5">
-                          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          <span className={`text-[10px] font-bold uppercase tracking-wider ${getFollowUpDateColor(followUp.follow_up_date)}`}>
-                            Next: {formatDateOnly(followUp.follow_up_date)}
-                          </span>
+                      {followUp.follow_up_date && (
+                        <div className="mt-2 pt-2 border-t border-slate-50 flex items-center gap-2">
+                          <div className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-100 inline-flex items-center gap-1.5">
+                            <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className={`text-[9px] font-bold uppercase tracking-wider ${getFollowUpDateColor(followUp.follow_up_date)}`}>
+                              Next: {formatDateOnly(followUp.follow_up_date)}
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -412,7 +424,7 @@ export function LeadFollowUps({
         </div>
 
         {/* Quick Add Form Section */}
-        <div className="p-5 border-t border-slate-100 bg-white/60 rounded-b-2xl">
+        <div className="p-3 border-t border-slate-100 bg-white/60 rounded-b-2xl">
           {canWrite ? (
             <form
               id="add-followup-form"
@@ -420,20 +432,24 @@ export function LeadFollowUps({
                 e.preventDefault()
                 const formData = new FormData(e.currentTarget)
                 const followUpData: LeadFollowUpFormData = {
-                  follow_up_date: formData.get('follow_up_date') as string,
-                  note: formData.get('note') as string,
+                  follow_up_date: (formData.get('follow_up_date') as string) || undefined,
+                  note: (formData.get('note') as string) || undefined,
                 }
                 await handleCreate(followUpData)
               }}
               className="space-y-4"
             >
+              <div className="mb-3">
+                <p className="text-xs text-slate-500 mb-2">
+                  Add a note or set a reminder date (at least one is required)
+                </p>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
                 <div className="sm:col-span-12">
                   <div className="relative group">
                     <textarea
                       name="note"
-                      required
-                      placeholder="Briefly describe the interaction..."
+                      placeholder="Briefly describe the interaction (optional)..."
                       rows={2}
                       className="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 placeholder-slate-400 shadow-sm transition-all duration-300 focus:border-cyan-500 focus:outline-none focus:ring-4 focus:ring-cyan-500/10 resize-none group-hover:border-slate-300"
                     ></textarea>
@@ -450,10 +466,9 @@ export function LeadFollowUps({
                     <input
                       type="date"
                       name="follow_up_date"
-                      required
                       className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-2.5 pl-11 text-xs font-bold text-slate-700 shadow-sm transition-all duration-300 focus:border-cyan-500 focus:outline-none focus:ring-4 focus:ring-cyan-500/10"
                     />
-                    <div className="absolute -top-2.5 left-4 px-1 bg-white text-[10px] font-bold text-cyan-600 uppercase tracking-widest border border-cyan-50 rounded">Set Reminder</div>
+                    <div className="absolute -top-2.5 left-4 px-1 bg-white text-[10px] font-bold text-cyan-600 uppercase tracking-widest border border-cyan-50 rounded">Set Reminder (Optional)</div>
                   </div>
                 </div>
 

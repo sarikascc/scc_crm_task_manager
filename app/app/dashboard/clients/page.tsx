@@ -1,6 +1,24 @@
 import { requireAuth, hasPermission } from '@/lib/auth/utils'
 import { redirect } from 'next/navigation'
 import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
+import { createClient } from '@/lib/supabase/server'
+import { ClientsClient } from './clients-client'
+
+async function getClients() {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('clients')
+    .select('id, name, company_name, phone, email, status, created_at, created_by')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching clients:', error)
+    return []
+  }
+
+  return data || []
+}
 
 export default async function ClientsPage() {
   const user = await requireAuth()
@@ -10,17 +28,13 @@ export default async function ClientsPage() {
     redirect('/dashboard?error=unauthorized')
   }
 
+  const canWrite = await hasPermission(user, MODULE_PERMISSION_IDS.clients, 'write')
+  const clients = await getClients()
+
   return (
-    <div className="rounded-lg bg-white p-12 shadow-sm">
-      <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#06B6D4]/10">
-          <svg className="h-8 w-8 text-[#06B6D4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-        </div>
-        <h2 className="mt-6 text-2xl font-semibold text-[#1E1B4B]">Coming Soon</h2>
-        <p className="mt-2 text-sm text-gray-600">The Clients module is currently under development and will be available soon.</p>
-      </div>
-    </div>
+    <ClientsClient
+      clients={clients}
+      canWrite={canWrite}
+    />
   )
 }

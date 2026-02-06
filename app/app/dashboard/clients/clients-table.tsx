@@ -1,49 +1,41 @@
 import { EmptyState } from '@/app/components/empty-state'
 import { Tooltip } from '@/app/components/ui/tooltip'
 
-type Lead = {
+type Client = {
   id: string
   name: string
   company_name: string | null
   phone: string
-  status: 'new' | 'contacted' | 'follow_up' | 'converted' | 'lost'
+  email: string | null
+  status: 'active' | 'inactive'
   created_at: string
-  follow_up_date: string | null
   created_by?: string
 }
 
-type SortField = 'name' | 'company_name' | 'phone' | 'status' | 'follow_up_date' | 'created_at' | null
+type SortField = 'name' | 'company_name' | 'phone' | 'status' | 'created_at' | null
 type SortDirection = 'asc' | 'desc' | null
 
-interface LeadsTableProps {
-  leads: Lead[]
+interface ClientsTableProps {
+  clients: Client[]
   canWrite: boolean
-  onView: (leadId: string) => void
-  onEdit: (leadId: string) => void
-  onDelete: (leadId: string, leadName: string) => void
-  onConvert?: (leadId: string) => void
-  canConvert?: boolean
+  onView: (clientId: string) => void
+  onEdit: (clientId: string) => void
+  onDelete: (clientId: string, clientName: string) => void
   sortField?: SortField
   sortDirection?: SortDirection
   onSort?: (field: SortField) => void
   isFiltered?: boolean
 }
 
-function StatusPill({ status }: { status: Lead['status'] }) {
+function StatusPill({ status }: { status: Client['status'] }) {
   const styles = {
-    new: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-600', ring: 'ring-blue-600/20' },
-    contacted: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-600', ring: 'ring-purple-600/20' },
-    follow_up: { bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-600', ring: 'ring-orange-600/20' },
-    converted: { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-600', ring: 'ring-green-600/20' },
-    lost: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-600', ring: 'ring-red-600/20' },
+    active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-600', ring: 'ring-emerald-600/20' },
+    inactive: { bg: 'bg-gray-50', text: 'text-gray-700', dot: 'bg-gray-600', ring: 'ring-gray-600/20' },
   }
 
   const labels = {
-    new: 'New',
-    contacted: 'Contacted',
-    follow_up: 'Follow Up',
-    converted: 'Converted',
-    lost: 'Lost',
+    active: 'Active',
+    inactive: 'Inactive',
   }
 
   const style = styles[status]
@@ -67,43 +59,6 @@ function formatDate(dateString: string) {
   })
 }
 
-function formatFollowUpDate(dateString: string | null) {
-  if (!dateString) return null
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-function getFollowUpDateColor(dateString: string | null): string {
-  if (!dateString) return 'text-gray-500'
-
-  const followUpDate = new Date(dateString)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const followUpDateOnly = new Date(followUpDate)
-  followUpDateOnly.setHours(0, 0, 0, 0)
-
-  const diffTime = followUpDateOnly.getTime() - today.getTime()
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-  // Red: today or past dates
-  if (diffDays <= 0) {
-    return 'text-rose-600 font-semibold'
-  }
-
-  // Orange: upcoming dates (within next 7 days)
-  if (diffDays <= 7) {
-    return 'text-amber-600 font-medium'
-  }
-
-  // Normal: other future dates
-  return 'text-gray-900 font-medium'
-}
-
 function SortIcon({ direction }: { direction: 'asc' | 'desc' | null }) {
   if (!direction) {
     return (
@@ -123,19 +78,17 @@ function SortIcon({ direction }: { direction: 'asc' | 'desc' | null }) {
   )
 }
 
-export function LeadsTable({
-  leads,
+export function ClientsTable({
+  clients,
   canWrite,
   onView,
   onEdit,
   onDelete,
-  onConvert,
-  canConvert = false,
   sortField = null,
   sortDirection = null,
   onSort,
   isFiltered = false,
-}: LeadsTableProps) {
+}: ClientsTableProps) {
   const handleSort = (field: SortField) => {
     if (!onSort) return
     if (sortField === field) {
@@ -145,25 +98,25 @@ export function LeadsTable({
     }
   }
 
-  const handleRowClick = (leadId: string, e: React.MouseEvent) => {
+  const handleRowClick = (clientId: string, e: React.MouseEvent) => {
     const target = e.target as HTMLElement
     if (target.closest('button')) {
       return
     }
-    onView(leadId)
+    onView(clientId)
   }
 
-  if (leads.length === 0) {
+  if (clients.length === 0) {
     return (
       <div className="flex h-full w-full min-h-[500px] items-center justify-center bg-white">
         <div className="w-full max-w-lg">
           <EmptyState
             variant={isFiltered ? 'search' : 'leads'}
-            title={isFiltered ? 'No leads found' : 'No leads yet'}
+            title={isFiltered ? 'No clients found' : 'No clients yet'}
             description={
               isFiltered
                 ? 'Try adjusting your filters.'
-                : 'Create your first lead to get started.'
+                : 'Create your first client to get started.'
             }
           />
         </div>
@@ -181,7 +134,7 @@ export function LeadsTable({
               onClick={() => handleSort('name')}
             >
               <div className="flex items-center">
-                Lead Name
+                Client Name
                 <SortIcon direction={sortField === 'name' ? sortDirection : null} />
               </div>
             </th>
@@ -204,21 +157,17 @@ export function LeadsTable({
               </div>
             </th>
             <th
+              className="group hidden md:table-cell md:w-[15%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+            >
+              Email
+            </th>
+            <th
               className="group w-[15%] sm:w-[12%] px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 cursor-pointer select-none hover:bg-gray-50 transition-colors"
               onClick={() => handleSort('status')}
             >
               <div className="flex items-center">
                 Status
                 <SortIcon direction={sortField === 'status' ? sortDirection : null} />
-              </div>
-            </th>
-            <th
-              className="group hidden md:table-cell md:w-[13%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 cursor-pointer select-none hover:bg-gray-50 transition-all duration-200"
-              onClick={() => handleSort('follow_up_date')}
-            >
-              <div className="flex items-center">
-                Follow-up
-                <SortIcon direction={sortField === 'follow_up_date' ? sortDirection : null} />
               </div>
             </th>
             <th
@@ -236,71 +185,55 @@ export function LeadsTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50 bg-white">
-          {leads.map((lead) => {
+          {clients.map((client) => {
             const canEdit = canWrite
             const canDelete = canWrite
 
             return (
               <tr
-                key={lead.id}
+                key={client.id}
                 className="group transition-all duration-200 hover:bg-slate-50 cursor-pointer"
-                onClick={(e) => handleRowClick(lead.id, e)}
+                onClick={(e) => handleRowClick(client.id, e)}
               >
                 <td className="px-4 sm:px-6 py-3">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-xs sm:text-sm font-bold text-white shadow-sm flex-shrink-0 ring-2 ring-white">
-                      {lead.name.substring(0, 2).toUpperCase()}
+                      {client.name.substring(0, 2).toUpperCase()}
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <span className="truncate text-sm sm:text-base font-semibold text-gray-900 leading-tight" title={lead.name}>
-                        {lead.name}
+                      <span className="truncate text-sm sm:text-base font-semibold text-gray-900 leading-tight" title={client.name}>
+                        {client.name}
                       </span>
                     </div>
                   </div>
                 </td>
                 <td className="hidden px-6 py-3 sm:table-cell">
-                  <div className="truncate text-sm text-gray-500" title={lead.company_name || '—'}>
-                    {lead.company_name || '—'}
+                  <div className="truncate text-sm text-gray-500" title={client.company_name || '—'}>
+                    {client.company_name || '—'}
                   </div>
                 </td>
                 <td className="px-4 sm:px-6 py-3">
-                  <div className="truncate text-sm text-gray-500 font-medium" title={lead.phone}>
-                    {lead.phone}
+                  <div className="truncate text-sm text-gray-500 font-medium" title={client.phone}>
+                    {client.phone}
+                  </div>
+                </td>
+                <td className="hidden px-6 py-3 md:table-cell">
+                  <div className="truncate text-sm text-gray-500" title={client.email || '—'}>
+                    {client.email || '—'}
                   </div>
                 </td>
                 <td className="px-4 sm:px-6 py-3">
-                  <StatusPill status={lead.status} />
-                </td>
-                <td className="hidden px-6 py-3 text-sm md:table-cell">
-                  {lead.follow_up_date ? (
-                    <span className={getFollowUpDateColor(lead.follow_up_date)}>
-                      {formatFollowUpDate(lead.follow_up_date)}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
+                  <StatusPill status={client.status} />
                 </td>
                 <td className="hidden px-6 py-3 text-sm text-gray-500 lg:table-cell">
-                  {formatDate(lead.created_at)}
+                  {formatDate(client.created_at)}
                 </td>
                 <td className="px-4 sm:px-6 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-2">
-                    {canConvert && onConvert && lead.status !== 'converted' && (
-                      <Tooltip content="Convert to client" position="left">
-                        <button
-                          onClick={() => onConvert(lead.id)}
-                          className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
-                        >
-                          <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </button>
-                      </Tooltip>
-                    )}
                     {canEdit && (
-                      <Tooltip content="Edit lead details" position="left">
+                      <Tooltip content="Edit client details" position="left">
                         <button
-                          onClick={() => onEdit(lead.id)}
+                          onClick={() => onEdit(client.id)}
                           className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                         >
                           <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -310,9 +243,9 @@ export function LeadsTable({
                       </Tooltip>
                     )}
                     {canDelete && (
-                      <Tooltip content="Remove lead record" position="left">
+                      <Tooltip content="Remove client record" position="left">
                         <button
-                          onClick={() => onDelete(lead.id, lead.name)}
+                          onClick={() => onDelete(client.id, client.name)}
                           className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
                         >
                           <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

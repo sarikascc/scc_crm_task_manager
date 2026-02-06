@@ -47,12 +47,14 @@ export function DashboardShell({
         }
     }, [isSidebarCollapsed, isHydrated]);
 
-    // Handle pages that define their own headers (Leads/Users/LeadDetail)
+    // Handle pages that define their own headers (Leads/Users/Clients/LeadDetail/ClientDetail)
     // For these pages, we hide the global header to prevent duplicates or flickering
     const hideGlobalHeader =
         pathname === '/dashboard/leads' ||
         pathname === '/dashboard/users' ||
-        pathname?.startsWith('/dashboard/leads/'); // detail page also has custom header
+        pathname === '/dashboard/clients' ||
+        pathname?.startsWith('/dashboard/leads/') || // lead detail page also has custom header
+        pathname?.startsWith('/dashboard/clients/'); // client detail page also has custom header
 
     const getTitle = () => {
         if (pathname?.includes('clients')) return 'Clients';
