@@ -1,62 +1,44 @@
 # Database Migrations
 
-This folder contains SQL migration files for setting up the database schema.
+This folder contains SQL migration files for setting up the database schema. The migrations have been consolidated module-wise for clarity and maintainability.
 
 ## Migration Files
 
-### 001_create_users_table.sql
-Creates the `users` table that extends Supabase auth.users with CRM-specific data:
-- User roles (admin, manager, user)
-- Active/inactive status
-- Full name
-- Timestamps
+### 001_auth_user_management.sql
+Consolidates all user-related setup:
+- Shared helper function `update_updated_at_column()`
+- `user_role` ENUM (admin, manager, staff, client)
+- `users` table (extending Supabase auth.users)
+- All user-specific indexes, including soft delete and permissions
+- RLS policies for user data
+- Failsafe `handle_new_user()` function and its trigger on `auth.users`
+- Sarika Admin seed data
 
-### 002_create_auth_trigger.sql
-Creates a trigger that automatically creates a user record in the `users` table when a new user is created in `auth.users`.
-
-### 003_create_sarika_admin_user.sql
-Creates the Sarika Admin user in the users table. **Important**: You must create the auth user in Supabase Dashboard first (see instructions in the file).
+### 002_lead_management.sql
+Consolidates all lead-related setup:
+- `leads` table and its status constraints
+- `lead_followups` table
+- All indexes for both tables
+- Comprehensive RLS policies for both tables
+- Timestamps update triggers
 
 ## How to Apply Migrations
 
 ### Option 1: Using Supabase Dashboard
-1. Go to your Supabase project dashboard
-2. Navigate to SQL Editor
-3. Copy and paste the contents of each migration file
-4. Run them in order (001, then 002)
+1. Go to your Supabase project dashboard.
+2. Navigate to **SQL Editor**.
+3. Copy and paste the contents of `001_auth_user_management.sql` and run it.
+4. Copy and paste the contents of `002_lead_management.sql` and run it.
 
 ### Option 2: Using Supabase CLI
 ```bash
-# If you have Supabase CLI installed
+# To push all migrations to your remote database
 supabase db push
 ```
 
-### Option 3: Manual Execution
-1. Connect to your Supabase database
-2. Execute each SQL file in order
-3. Verify the tables and policies were created correctly
-
 ## Important Notes
 
-1. **Email Confirmation**: Make sure to disable email confirmation in Supabase Auth settings:
-   - Go to Authentication > Settings
-   - Disable "Enable email confirmations"
-
-2. **User Creation**: Since we're not allowing signup in the UI, users must be created manually:
-   - Via Supabase Dashboard (Authentication > Users > Add User)
-   - Via Supabase API
-   - The trigger will automatically create a corresponding record in the `users` table
-
-3. **RLS Policies**: Row Level Security is enabled on the `users` table. Adjust policies as needed for your use case.
-
-4. **Roles**: Default role is 'user'. Update user roles as needed:
-   ```sql
-   UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
-   ```
-
-5. **Creating Users**: To create a new user:
-   - First create the auth user in Supabase Dashboard (Authentication > Users)
-   - The trigger from migration 002 will auto-create the users table entry
-   - Then update the role and other fields as needed
-   - See `003_create_sarika_admin_user.sql` for an example
-
+1. **Email Confirmation**: Disable email confirmation in Supabase Auth settings if you want immediate access after creation.
+2. **User Creation**: Since signup is restricted in the UI, users must be created manually in the Supabase Dashboard. The trigger will automatically create the corresponding record in the `public.users` table.
+3. **Admin User**: The `001` migration includes a seed for `sarika@crm.com`. Ensure this auth user exists in Supabase before running, or run the seed part manually after creating the user.
+4. **RLS**: Row Level Security is active on all tables. Policies ensure that users can only see their own data, while admins have full access.
