@@ -1,5 +1,5 @@
 import { requireAuth, hasPermission } from '@/lib/auth/utils'
-import { getLead } from '@/lib/leads/actions'
+import { getLead, getLeadFollowUps } from '@/lib/leads/actions'
 import { notFound, redirect } from 'next/navigation'
 import { LeadDetailView } from './lead-detail-view'
 import { Header } from '@/app/components/dashboard/header'
@@ -19,14 +19,17 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
     redirect('/dashboard?error=unauthorized')
   }
 
-  // Fetch lead data
-  const result = await getLead(lead_id)
+  const [leadResult, followUpsResult] = await Promise.all([
+    getLead(lead_id),
+    getLeadFollowUps(lead_id),
+  ])
 
-  if (result.error || !result.data) {
+  if (leadResult.error || !leadResult.data) {
     notFound()
   }
 
-  const lead = result.data
+  const lead = leadResult.data
+  const initialFollowUps = followUpsResult.data ?? []
   const canWrite = await hasPermission(user, MODULE_PERMISSION_IDS.leads, 'write')
   const canCreateClient = await hasPermission(user, MODULE_PERMISSION_IDS.clients, 'write')
 
@@ -54,6 +57,7 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
       <div className="flex-1 overflow-hidden px-4 lg:px-6 pt-2 lg:pt-3 pb-2">
         <LeadDetailView
           lead={lead}
+          initialFollowUps={initialFollowUps}
           canWrite={canWrite}
           canCreateClient={canCreateClient}
         />

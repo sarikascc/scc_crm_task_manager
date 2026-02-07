@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { EmptyState } from '@/app/components/empty-state'
 import { Tooltip } from '@/app/components/ui/tooltip'
 
@@ -102,14 +103,6 @@ export function ClientsTable({
     }
   }
 
-  const handleRowClick = (clientId: string, e: React.MouseEvent) => {
-    const target = e.target as HTMLElement
-    if (target.closest('button')) {
-      return
-    }
-    onView(clientId)
-  }
-
   if (clients.length === 0) {
     return (
       <div className="flex h-full w-full min-h-[500px] items-center justify-center bg-white">
@@ -197,10 +190,13 @@ export function ClientsTable({
               <tr
                 key={client.id}
                 className="group transition-all duration-200 hover:bg-slate-50 cursor-pointer"
-                onClick={(e) => handleRowClick(client.id, e)}
               >
                 <td className="px-4 sm:px-6 py-3">
-                  <div className="flex items-center gap-2 sm:gap-3">
+                  <Link
+                    href={`/dashboard/clients/${client.id}`}
+                    prefetch
+                    className="flex items-center gap-2 sm:gap-3 no-underline text-inherit"
+                  >
                     <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-xs sm:text-sm font-bold text-white shadow-sm flex-shrink-0 ring-2 ring-white">
                       {client.name.substring(0, 2).toUpperCase()}
                     </div>
@@ -209,30 +205,34 @@ export function ClientsTable({
                         {client.name}
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 </td>
                 <td className="hidden px-6 py-3 sm:table-cell">
-                  <div className="truncate text-sm text-gray-500" title={client.company_name || '—'}>
+                  <Link href={`/dashboard/clients/${client.id}`} prefetch className="block truncate text-sm text-gray-500 no-underline text-inherit" title={client.company_name || '—'}>
                     {client.company_name || '—'}
-                  </div>
+                  </Link>
                 </td>
                 <td className="px-4 sm:px-6 py-3">
-                  <div className="truncate text-sm text-gray-500 font-medium" title={client.phone}>
+                  <Link href={`/dashboard/clients/${client.id}`} prefetch className="block truncate text-sm text-gray-500 font-medium no-underline text-inherit" title={client.phone}>
                     {client.phone}
-                  </div>
+                  </Link>
                 </td>
                 <td className="hidden px-6 py-3 md:table-cell">
-                  <div className="truncate text-sm text-gray-500" title={client.email || '—'}>
+                  <Link href={`/dashboard/clients/${client.id}`} prefetch className="block truncate text-sm text-gray-500 no-underline text-inherit" title={client.email || '—'}>
                     {client.email || '—'}
-                  </div>
+                  </Link>
                 </td>
                 <td className="px-4 sm:px-6 py-3">
-                  <StatusPill status={client.status} />
+                  <Link href={`/dashboard/clients/${client.id}`} prefetch className="block no-underline text-inherit">
+                    <StatusPill status={client.status} />
+                  </Link>
                 </td>
                 <td className="hidden px-6 py-3 text-sm text-gray-500 lg:table-cell">
-                  {formatDate(client.created_at)}
+                  <Link href={`/dashboard/clients/${client.id}`} prefetch className="block no-underline text-inherit">
+                    {formatDate(client.created_at)}
+                  </Link>
                 </td>
-                <td className="px-4 sm:px-6 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
+                <td className="px-4 sm:px-6 py-3 text-right text-sm">
                   <div className="flex items-center justify-end gap-2">
                     {canManageInternalNotes && onOpenInternalNotes && (
                       <Tooltip content="Internal notes" position="left">

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Tooltip } from '@/app/components/ui/tooltip'
-import { Lead, LeadStatus, getLead, updateLead, deleteLead, LeadFormData } from '@/lib/leads/actions'
+import { Lead, LeadStatus, LeadFollowUp, getLead, updateLead, deleteLead, LeadFormData } from '@/lib/leads/actions'
 import { createClient, ClientFormData } from '@/lib/clients/actions'
 import { LeadFollowUps } from '../lead-followups'
 import { LeadForm } from '../lead-form'
@@ -14,6 +14,7 @@ import { useToast } from '@/app/components/ui/toast-context'
 
 interface LeadDetailViewProps {
   lead: Lead
+  initialFollowUps?: LeadFollowUp[]
   canWrite: boolean
   canCreateClient?: boolean
 }
@@ -74,6 +75,7 @@ function getInitials(name: string | null | undefined): string {
 
 export function LeadDetailView({
   lead: initialLead,
+  initialFollowUps = [],
   canWrite,
   canCreateClient = false,
 }: LeadDetailViewProps) {
@@ -396,6 +398,7 @@ export function LeadDetailView({
           <LeadFollowUps
             leadId={lead.id}
             leadFollowUpDate={lead.follow_up_date}
+            initialFollowUps={initialFollowUps}
             canWrite={canWrite}
             onLatestFollowUpDateChange={handleLatestFollowUpDateChange}
           />
@@ -472,6 +475,7 @@ export function LeadDetailView({
               <LeadFollowUps
                 leadId={lead.id}
                 leadFollowUpDate={lead.follow_up_date}
+                initialFollowUps={initialFollowUps}
                 canWrite={canWrite}
                 hideHeader={true}
                 className="!bg-transparent !shadow-none !border-none !p-0 !rounded-none h-full"

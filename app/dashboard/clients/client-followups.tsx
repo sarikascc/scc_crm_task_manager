@@ -20,6 +20,8 @@ import { FollowUpDeleteModal } from '@/app/dashboard/leads/follow-up-delete-moda
 
 interface ClientFollowUpsProps {
   clientId: string
+  initialClientFollowUps?: ClientFollowUp[]
+  initialLeadFollowUps?: Array<{ id: string; client_id: string | null; note: string | null; follow_up_date: string | null; created_by: string; created_by_name: string; created_at: string; updated_at: string }>
   canWrite: boolean
   className?: string
   hideHeader?: boolean
@@ -93,6 +95,8 @@ function getInitials(name: string | null | undefined): string {
 
 export function ClientFollowUps({
   clientId,
+  initialClientFollowUps = [],
+  initialLeadFollowUps = [],
   canWrite,
   className = '',
   hideHeader = false,
@@ -100,9 +104,10 @@ export function ClientFollowUps({
   const router = useRouter()
   const { success: showSuccess, error: showError } = useToast()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const [clientFollowUps, setClientFollowUps] = useState<ClientFollowUp[]>([])
-  const [leadFollowUps, setLeadFollowUps] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [clientFollowUps, setClientFollowUps] = useState<ClientFollowUp[]>(initialClientFollowUps)
+  const [leadFollowUps, setLeadFollowUps] = useState<any[]>(initialLeadFollowUps)
+  const hasInitialData = initialClientFollowUps.length > 0 || initialLeadFollowUps.length > 0
+  const [loading, setLoading] = useState(!hasInitialData)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -142,7 +147,11 @@ export function ClientFollowUps({
   }
 
   useEffect(() => {
-    fetchFollowUps()
+    if (hasInitialData) {
+      fetchFollowUps({ silent: true })
+    } else {
+      fetchFollowUps()
+    }
   }, [clientId])
 
   useEffect(() => {
@@ -280,11 +289,12 @@ export function ClientFollowUps({
     }
   }
 
-  if (loading) {
+  const totalFollowUps = clientFollowUps.length + leadFollowUps.length
+  if (loading && totalFollowUps === 0) {
     return (
-      <div className="h-full flex flex-col px-2 py-2 sm:px-3 sm:py-3 bg-white">
-        <div className="mb-2 sm:mb-3">
-          <div className="flex items-center justify-between gap-2 mb-2">
+      <div className={`h-full flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm ${className}`}>
+        {!hideHeader && (
+          <div className="mb-2 sm:mb-3 px-2 pt-2 sm:px-3 sm:pt-3">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#06B6D4] to-[#0891b2] flex items-center justify-center shadow-md">
                 <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -294,20 +304,15 @@ export function ClientFollowUps({
               <h4 className="text-lg sm:text-xl font-bold text-[#1E1B4B]">Follow-Ups</h4>
             </div>
           </div>
-        </div>
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-xl shadow-md p-3 sm:p-4 border border-gray-100">
-              <div className="flex gap-4">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 rounded-full bg-gray-200 animate-pulse" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-32 rounded bg-gray-200 animate-pulse" />
-                  <div className="h-3 w-full rounded bg-gray-200 animate-pulse" />
-                  <div className="h-3 w-3/4 rounded bg-gray-200 animate-pulse" />
-                </div>
-              </div>
-            </div>
-          ))}
+        )}
+        <div className="flex-1 flex items-center justify-center px-4 py-8">
+          <div className="flex flex-col items-center gap-2 text-gray-500">
+            <svg className="h-8 w-8 animate-spin text-[#06B6D4]" fill="none" viewBox="0 0 24 24" aria-hidden>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span className="text-sm font-medium">Loading follow-ups...</span>
+          </div>
         </div>
       </div>
     )
@@ -349,6 +354,15 @@ export function ClientFollowUps({
               </svg>
             </div>
             <h4 className="font-['Plus_Jakarta_Sans',sans-serif] text-xl font-extrabold text-[#0C4A6E] tracking-tight">Timeline</h4>
+            {loading && (
+              <span className="text-xs text-cyan-600 flex items-center gap-1.5 font-medium">
+                <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Updating…
+              </span>
+            )}
           </div>
         </div>
       )}

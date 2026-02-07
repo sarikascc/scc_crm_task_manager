@@ -1,5 +1,5 @@
 import { requireAuth, hasPermission } from '@/lib/auth/utils'
-import { getClient } from '@/lib/clients/actions'
+import { getClient, getClientFollowUps, getLeadFollowUpsForClient } from '@/lib/clients/actions'
 import { notFound, redirect } from 'next/navigation'
 import { ClientDetailView } from './client-detail-view'
 import { Header } from '@/app/components/dashboard/header'
@@ -19,14 +19,19 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
     redirect('/dashboard?error=unauthorized')
   }
 
-  // Fetch client data
-  const result = await getClient(client_id)
+  const [clientResult, clientFollowUpsResult, leadFollowUpsResult] = await Promise.all([
+    getClient(client_id),
+    getClientFollowUps(client_id),
+    getLeadFollowUpsForClient(client_id),
+  ])
 
-  if (result.error || !result.data) {
+  if (clientResult.error || !clientResult.data) {
     notFound()
   }
 
-  const client = result.data
+  const client = clientResult.data
+  const initialClientFollowUps = clientFollowUpsResult.data ?? []
+  const initialLeadFollowUps = leadFollowUpsResult.data ?? []
   const canWrite = await hasPermission(user, MODULE_PERMISSION_IDS.clients, 'write')
   const canManageInternalNotes = user.role === 'admin' || user.role === 'manager'
 
@@ -54,6 +59,8 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
       <div className="flex-1 overflow-hidden px-4 lg:px-6 pt-2 lg:pt-3 pb-2">
         <ClientDetailView
           client={client}
+          initialClientFollowUps={initialClientFollowUps}
+          initialLeadFollowUps={initialLeadFollowUps}
           canWrite={canWrite}
           canManageInternalNotes={canManageInternalNotes}
         />

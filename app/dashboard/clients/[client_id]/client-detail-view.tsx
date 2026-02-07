@@ -3,14 +3,18 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Tooltip } from '@/app/components/ui/tooltip'
-import { Client, ClientStatus, getClient, updateClient, deleteClient, ClientFormData } from '@/lib/clients/actions'
+import { Client, ClientStatus, ClientFollowUp, getClient, updateClient, deleteClient, ClientFormData } from '@/lib/clients/actions'
 import { ClientFollowUps } from '../client-followups'
 import { ClientModal } from '../client-modal'
 import { DeleteConfirmModal } from '../delete-confirm-modal'
 import { InternalNotesPanel } from '../internal-notes-panel'
 
+type LeadFollowUpForClient = { id: string; client_id: string | null; note: string | null; follow_up_date: string | null; created_by: string; created_by_name: string; created_at: string; updated_at: string }
+
 interface ClientDetailViewProps {
   client: Client
+  initialClientFollowUps?: ClientFollowUp[]
+  initialLeadFollowUps?: LeadFollowUpForClient[]
   canWrite: boolean
   canManageInternalNotes: boolean
 }
@@ -65,6 +69,8 @@ function getInitials(name: string | null | undefined): string {
 
 export function ClientDetailView({
   client: initialClient,
+  initialClientFollowUps = [],
+  initialLeadFollowUps = [],
   canWrite,
   canManageInternalNotes,
 }: ClientDetailViewProps) {
@@ -303,6 +309,8 @@ export function ClientDetailView({
         <div className="hidden lg:flex w-1/2 h-full flex-col">
           <ClientFollowUps
             clientId={client.id}
+            initialClientFollowUps={initialClientFollowUps}
+            initialLeadFollowUps={initialLeadFollowUps}
             canWrite={canWrite}
           />
         </div>
@@ -391,6 +399,8 @@ export function ClientDetailView({
             <div className="flex-1 overflow-hidden">
               <ClientFollowUps
                 clientId={client.id}
+                initialClientFollowUps={initialClientFollowUps}
+                initialLeadFollowUps={initialLeadFollowUps}
                 canWrite={canWrite}
                 hideHeader={true}
                 className="!bg-transparent !shadow-none !border-none !p-0 !rounded-none h-full"
