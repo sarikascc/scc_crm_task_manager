@@ -251,17 +251,20 @@ export function LeadsClient({
     }
   }
 
-  const handleFilterChange = (updates: { search?: string; status?: LeadStatus | 'all'; followUp?: FollowUpDateFilterType }) => {
-    const q = buildSearchParams({
-      ...updates,
-      page: 1,
-    })
-    router.push(`${pathname}${q ? `?${q}` : ''}`)
-  }
+  const handleFilterChange = useCallback(
+    (updates: { search?: string; status?: LeadStatus | 'all'; followUp?: FollowUpDateFilterType }) => {
+      const q = buildSearchParams({
+        ...updates,
+        page: 1,
+      })
+      router.push(`${pathname}${q ? `?${q}` : ''}`)
+    },
+    [buildSearchParams, pathname, router]
+  )
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     router.push(pathname)
-  }
+  }, [pathname, router])
 
   const handlePageChange = (newPage: number) => {
     const q = buildSearchParams({ page: newPage })

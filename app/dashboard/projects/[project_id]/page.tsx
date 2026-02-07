@@ -4,7 +4,9 @@ import { getClientsForSelect } from '@/lib/clients/actions'
 import { getTechnologyTools } from '@/lib/settings/technology-tools-actions'
 import { getStaffForSelect } from '@/lib/users/actions'
 import { notFound, redirect } from 'next/navigation'
+import Link from 'next/link'
 import { ProjectDetailView } from './project-detail-view'
+import { Header } from '@/app/components/dashboard/header'
 import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
 
 interface ProjectDetailPageProps {
@@ -40,9 +42,28 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   const canManageFollowUps = canManageProject || user.role === 'staff'
   const canViewAmount = user.role === 'admin' || user.role === 'manager'
 
+  const breadcrumb = (
+    <div className="flex items-center gap-2 text-sm">
+      <Link
+        href="/dashboard/projects"
+        className="font-medium text-[#06B6D4] hover:text-[#0891b2] hover:underline transition-colors"
+      >
+        Projects
+      </Link>
+      <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+      <span className="font-['Poppins',sans-serif] text-lg font-bold text-[#0C4A6E]">Project Details</span>
+    </div>
+  )
+
   return (
-    <div className="flex h-full flex-col p-4 lg:p-6">
-      <div className="flex-1 overflow-hidden">
+    <div className="flex flex-col h-full">
+      <Header
+        pageTitle="Project Details"
+        breadcrumb={breadcrumb}
+      />
+      <div className="flex-1 overflow-hidden px-4 lg:px-6 pt-2 lg:pt-3 pb-2">
         <ProjectDetailView
           project={project}
           initialFollowUps={initialFollowUps}
@@ -50,6 +71,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           canManageFollowUps={canManageFollowUps}
           canViewAmount={canViewAmount}
           userRole={user.role}
+          currentUserId={user.id}
           clients={clientsResult.data}
           clientsError={clientsResult.error}
           technologyTools={toolsResult.data}
@@ -61,3 +83,4 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
     </div>
   )
 }
+

@@ -1,10 +1,12 @@
 'use server'
 
+import crypto from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { encryptAmount, decryptAmount } from '@/lib/amount-encryption'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser, hasPermission } from '@/lib/auth/utils'
 import { MODULE_PERMISSION_IDS } from '@/lib/permissions'
+import { computeMemberWorkSeconds } from '@/lib/projects/work-utils'
 
 export type ProjectStatus = 'pending' | 'in_progress' | 'hold' | 'completed'
 export type ProjectStaffStatus = 'start' | 'hold' | 'end'
@@ -36,10 +38,29 @@ export type ProjectTechnologyTool = {
   name: string
 }
 
+export type ProjectTeamMemberWorkStatus = 'not_started' | 'start' | 'hold' | 'end'
+
 export type ProjectTeamMember = {
   id: string
   full_name: string | null
   email: string | null
+  work_status?: ProjectTeamMemberWorkStatus
+  work_started_at?: string | null
+  work_ended_at?: string | null
+  work_done_notes?: string | null
+  /** Total work seconds (computed from time events) */
+  total_work_seconds?: number
+  /** When current running segment started (if work_status === 'start') */
+  work_running_since?: string | null
+  /** Per-day work seconds for analytics */
+  work_day_breakdown?: { date: string; seconds: number }[]
+}
+
+export type ProjectTeamMemberTimeEvent = {
+  user_id: string
+  event_type: 'start' | 'hold' | 'resume' | 'end'
+  occurred_at: string
+  note?: string | null
 }
 
 export type Project = {
@@ -62,6 +83,7 @@ export type Project = {
   client?: ProjectClientInfo | null
   technology_tools?: ProjectTechnologyTool[]
   team_members?: ProjectTeamMember[]
+  team_member_time_events?: ProjectTeamMemberTimeEvent[]
 }
 
 export type ProjectSortField =
@@ -91,6 +113,7 @@ export type ProjectListItem = {
   status: ProjectStatus
   priority?: ProjectPriority
   start_date: string
+  developer_deadline_date: string | null
   website_links: string | null
   created_at: string
   created_by?: string
@@ -230,8 +253,19 @@ function normalizeTool(row: any): ProjectTechnologyTool | null {
 
 function normalizeTeamMember(row: any): ProjectTeamMember | null {
   if (!row) return null
-  if (Array.isArray(row)) return row[0] ?? null
-  return row as ProjectTeamMember
+  if (Array.isArray(row)) return normalizeTeamMember(row[0])
+  const user = row.users ?? row
+  const id = user?.id ?? row?.user_id
+  if (!id) return null
+  return {
+    id,
+    full_name: user.full_name ?? null,
+    email: user.email ?? null,
+    work_status: row.work_status ?? 'not_started',
+    work_started_at: row.work_started_at ?? null,
+    work_ended_at: row.work_ended_at ?? null,
+    work_done_notes: row.work_done_notes ?? null,
+  }
 }
 
 async function isUserAssignedToProject(
@@ -281,7 +315,7 @@ export async function getProjectsPage(options: GetProjectsPageOptions = {}) {
   let query = supabase
     .from('projects')
     .select(
-      'id, name, logo_url, client_id, project_amount, status, priority, start_date, website_links, created_at, created_by, clients(id, name, company_name)',
+      'id, name, logo_url, client_id, project_amount, status, priority, start_date, developer_deadline_date, website_links, created_at, created_by, clients(id, name, company_name)',
       { count: 'exact' }
     )
 
@@ -289,7 +323,7 @@ export async function getProjectsPage(options: GetProjectsPageOptions = {}) {
     query = supabase
       .from('projects')
       .select(
-        'id, name, logo_url, client_id, project_amount, status, priority, start_date, website_links, created_at, created_by, clients(id, name, company_name), project_team_members!inner(user_id)',
+        'id, name, logo_url, client_id, project_amount, status, priority, start_date, developer_deadline_date, website_links, created_at, created_by, clients(id, name, company_name), project_team_members!inner(user_id)',
         { count: 'exact' }
       )
       .eq('project_team_members.user_id', currentUser.id)
@@ -342,6 +376,7 @@ export async function getProjectsPage(options: GetProjectsPageOptions = {}) {
       status: row.status,
       priority: row.priority ?? 'medium',
       start_date: row.start_date,
+      developer_deadline_date: row.developer_deadline_date ?? null,
       website_links: row.website_links ?? null,
       created_at: row.created_at,
       created_by: row.created_by,
@@ -390,18 +425,53 @@ export async function getProject(projectId: string): Promise<{ data: Project | n
     .select('technology_tools(id, name)')
     .eq('project_id', projectId)
 
-  const { data: teamRows } = await supabase
+  let teamRows: any[] | null = null
+  const { data: teamRowsWithWork, error: teamWorkError } = await supabase
     .from('project_team_members')
-    .select('users(id, full_name, email)')
+    .select('user_id, work_status, work_started_at, work_ended_at, work_done_notes, users(id, full_name, email)')
     .eq('project_id', projectId)
+
+  if (!teamWorkError && teamRowsWithWork) {
+    teamRows = teamRowsWithWork
+  } else {
+    const { data: teamRowsBasic } = await supabase
+      .from('project_team_members')
+      .select('user_id, users(id, full_name, email)')
+      .eq('project_id', projectId)
+    teamRows = teamRowsBasic || []
+  }
 
   const tools = ((toolRows as Array<{ technology_tools: ProjectTechnologyTool | ProjectTechnologyTool[] }> | null) || [])
     .map((row) => normalizeTool(row.technology_tools))
     .filter((tool): tool is ProjectTechnologyTool => Boolean(tool))
 
-  const teamMembers = ((teamRows as Array<{ users: ProjectTeamMember | ProjectTeamMember[] }> | null) || [])
-    .map((row) => normalizeTeamMember(row.users))
-    .filter((member): member is ProjectTeamMember => Boolean(member))
+  let teamMembers = ((teamRows as any[]) || []).map((row) => normalizeTeamMember(row)).filter((member): member is ProjectTeamMember => Boolean(member))
+
+  let team_member_time_events: ProjectTeamMemberTimeEvent[] = []
+  const { data: timeEventRows, error: timeEventsError } = await supabase
+    .from('project_team_member_time_events')
+    .select('user_id, event_type, occurred_at, note')
+    .eq('project_id', projectId)
+    .order('occurred_at', { ascending: true })
+
+  if (!timeEventsError && timeEventRows) {
+    team_member_time_events = timeEventRows.map((e: any) => ({
+      user_id: e.user_id,
+      event_type: e.event_type,
+      occurred_at: e.occurred_at,
+      note: e.note ?? null,
+    }))
+  }
+
+  teamMembers = teamMembers.map((m) => {
+    const computed = computeMemberWorkSeconds(m.id, team_member_time_events)
+    return {
+      ...m,
+      total_work_seconds: computed.totalSeconds,
+      work_running_since: computed.runningSince ?? null,
+      work_day_breakdown: computed.dayBreakdown,
+    }
+  })
 
   const client = normalizeClient((data as any).clients)
   const canViewAmount = canViewProjectAmount(currentUser.role)
@@ -431,6 +501,7 @@ export async function getProject(projectId: string): Promise<{ data: Project | n
       : null,
     technology_tools: tools,
     team_members: teamMembers,
+    team_member_time_events,
   }
 
   return { data: project, error: null }
@@ -451,7 +522,7 @@ export async function createProject(formData: ProjectFormData): Promise<ProjectA
     return { data: null, error: 'Project name, client, and start date are required' }
   }
 
-  const developerDeadlineError = validateSingleDate(formData.developer_deadline_date, 'Developer deadline date')
+  const developerDeadlineError = validateSingleDate(formData.developer_deadline_date, 'Project deadline date')
   if (developerDeadlineError) {
     return { data: null, error: developerDeadlineError }
   }
@@ -566,7 +637,7 @@ export async function updateProject(projectId: string, formData: ProjectFormData
     return { data: null, error: 'Project name, client, and start date are required' }
   }
 
-  const developerDeadlineError = validateSingleDate(formData.developer_deadline_date, 'Developer deadline date')
+  const developerDeadlineError = validateSingleDate(formData.developer_deadline_date, 'Project deadline date')
   if (developerDeadlineError) {
     return { data: null, error: developerDeadlineError }
   }
@@ -688,12 +759,10 @@ export async function updateProjectStatus(
   }
 
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('projects')
     .update({ status } as never)
     .eq('id', projectId)
-    .select()
-    .single()
 
   if (error) {
     console.error('Error updating project status:', error)
@@ -701,7 +770,9 @@ export async function updateProjectStatus(
   }
 
   revalidatePath('/dashboard/projects')
-  return { data: data as unknown as Project, error: null }
+  revalidatePath(`/dashboard/projects/${projectId}`)
+  const result = await getProject(projectId)
+  return result.error ? { data: null, error: result.error } : { data: result.data!, error: null }
 }
 
 export async function updateProjectStaffStatus(
@@ -722,12 +793,10 @@ export async function updateProjectStaffStatus(
     }
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('projects')
     .update({ staff_status: staffStatus } as never)
     .eq('id', projectId)
-    .select()
-    .single()
 
   if (error) {
     console.error('Error updating project staff status:', error)
@@ -735,7 +804,88 @@ export async function updateProjectStaffStatus(
   }
 
   revalidatePath('/dashboard/projects')
-  return { data: data as unknown as Project, error: null }
+  revalidatePath(`/dashboard/projects/${projectId}`)
+  const result = await getProject(projectId)
+  return result.error ? { data: null, error: result.error } : { data: result.data!, error: null }
+}
+
+export type UpdateMyWorkStatusResult =
+  | { data: Project; error: null }
+  | { data: null; error: string }
+
+export async function updateMyProjectWorkStatus(
+  projectId: string,
+  eventType: 'start' | 'hold' | 'resume' | 'end',
+  note?: string | null
+): Promise<UpdateMyWorkStatusResult> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    return { data: null, error: 'You must be logged in to update work status' }
+  }
+
+  const supabase = await createClient()
+  const isAssigned = await isUserAssignedToProject(supabase, projectId, currentUser.id)
+  if (!isAssigned) {
+    return { data: null, error: 'You are not assigned to this project' }
+  }
+
+  const { data: memberRow } = await supabase
+    .from('project_team_members')
+    .select('work_status')
+    .eq('project_id', projectId)
+    .eq('user_id', currentUser.id)
+    .single()
+
+  const currentStatus = (memberRow as any)?.work_status ?? 'not_started'
+  const validTransitions: Record<string, string[]> = {
+    not_started: ['start'],
+    start: ['hold', 'end'],
+    hold: ['resume', 'end'],
+    end: [],
+  }
+  const allowed = validTransitions[currentStatus] || []
+  if (!allowed.includes(eventType)) {
+    return { data: null, error: `Cannot ${eventType} from current status (${currentStatus})` }
+  }
+
+  const now = new Date().toISOString()
+  const { error: eventError } = await supabase.from('project_team_member_time_events').insert({
+    project_id: projectId,
+    user_id: currentUser.id,
+    event_type: eventType,
+    occurred_at: now,
+    note: eventType === 'end' ? (note ?? null) : null,
+  })
+
+  if (eventError) {
+    console.error('Error inserting time event:', eventError)
+    return { data: null, error: eventError.message || 'Failed to record work event' }
+  }
+
+  const updates: Record<string, unknown> = { work_status: eventType === 'resume' ? 'start' : eventType }
+  if (eventType === 'start') {
+    updates.work_started_at = now
+  }
+  if (eventType === 'end') {
+    updates.work_ended_at = now
+    updates.work_done_notes = note ?? null
+  }
+
+  const { error: updateError } = await supabase
+    .from('project_team_members')
+    .update(updates as never)
+    .eq('project_id', projectId)
+    .eq('user_id', currentUser.id)
+
+  if (updateError) {
+    console.error('Error updating team member work status:', updateError)
+    return { data: null, error: updateError.message || 'Failed to update work status' }
+  }
+
+  revalidatePath(`/dashboard/projects/${projectId}`)
+  revalidatePath('/dashboard/projects')
+  const result = await getProject(projectId)
+  return result.error ? { data: null, error: result.error } : { data: result.data!, error: null }
 }
 
 export async function deleteProject(projectId: string) {

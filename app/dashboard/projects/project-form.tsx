@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useRef, useState, useEffect } from 'react'
 import {
   ProjectFormData,
   ProjectPriority,
@@ -53,8 +53,8 @@ export function ProjectForm({
   teamMembersError,
 }: ProjectFormProps) {
   const [logoUrl, setLogoUrl] = useState(initialData?.logo_url || '')
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string>('')
   const [logoError, setLogoError] = useState<string | null>(null)
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [selectedToolIds, setSelectedToolIds] = useState<string[]>(
     initialData?.technology_tool_ids ?? []
   )
@@ -62,13 +62,54 @@ export function ProjectForm({
     initialData?.team_member_ids ?? []
   )
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const pendingLogoFileRef = useRef<File | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl)
+    }
+  }, [logoPreviewUrl])
+
+  const uploadLogoFile = async (file: File): Promise<string | null> => {
+    const signatureResult = await getProjectLogoUploadSignature()
+    if (signatureResult.error || !signatureResult.data) {
+      throw new Error(signatureResult.error || 'Failed to prepare logo upload.')
+    }
+    const signature = signatureResult.data
+    const uploadForm = new FormData()
+    uploadForm.append('file', file)
+    uploadForm.append('api_key', signature.apiKey)
+    uploadForm.append('timestamp', String(signature.timestamp))
+    uploadForm.append('signature', signature.signature)
+    uploadForm.append('folder', signature.folder)
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${signature.cloudName}/image/upload`,
+      { method: 'POST', body: uploadForm }
+    )
+    if (!response.ok) throw new Error('Upload failed')
+    const data = await response.json()
+    return data.secure_url ?? null
+  }
 
   const [state, formAction, isPending] = useActionState(
     async (_prevState: { error: string | null } | null, formData: FormData) => {
+      let finalLogoUrl: string | undefined = logoUrl?.trim() || undefined
+      const pendingFile = pendingLogoFileRef.current
+      if (pendingFile) {
+        try {
+          const uploadedUrl = await uploadLogoFile(pendingFile)
+          if (uploadedUrl) finalLogoUrl = uploadedUrl
+          pendingLogoFileRef.current = null
+        } catch (err) {
+          console.error('Project logo upload failed:', err)
+          return { error: 'Could not upload logo. Please try again.' }
+        }
+      }
+
       const amountValue = canViewAmount ? Number.parseFloat(formData.get('project_amount') as string) : undefined
       const projectData: ProjectFormData = {
         name: (formData.get('name') as string) || '',
-        logo_url: logoUrl || undefined,
+        logo_url: finalLogoUrl,
         client_id: (formData.get('client_id') as string) || '',
         project_amount: Number.isFinite(amountValue) ? amountValue : undefined,
         priority: (formData.get('priority') as ProjectPriority) || 'medium',
@@ -102,7 +143,7 @@ export function ProjectForm({
     fileInputRef.current?.click()
   }
 
-  const handleLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -112,52 +153,33 @@ export function ProjectForm({
       return
     }
 
-    if (!file.type.startsWith('image/')) {
-      setLogoError('Logo must be an image file.')
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg']
+    if (!allowedTypes.includes(file.type)) {
+      setLogoError('Logo must be PNG or JPG. GIF is not supported.')
       event.target.value = ''
       return
     }
 
     setLogoError(null)
-    setIsUploadingLogo(true)
-
-    const signatureResult = await getProjectLogoUploadSignature()
-    if (signatureResult.error || !signatureResult.data) {
-      setIsUploadingLogo(false)
-      setLogoError(signatureResult.error || 'Failed to prepare logo upload.')
-      return
-    }
-
-    try {
-      const signature = signatureResult.data
-      const uploadForm = new FormData()
-      uploadForm.append('file', file)
-      uploadForm.append('api_key', signature.apiKey)
-      uploadForm.append('timestamp', String(signature.timestamp))
-      uploadForm.append('signature', signature.signature)
-      uploadForm.append('folder', signature.folder)
-
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${signature.cloudName}/image/upload`,
-        {
-          method: 'POST',
-          body: uploadForm,
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error('Upload failed')
-      }
-
-      const data = await response.json()
-      setLogoUrl(data.secure_url)
-    } catch (uploadError) {
-      console.error('Project logo upload failed:', uploadError)
-      setLogoError('Could not upload logo. Please try again.')
-    } finally {
-      setIsUploadingLogo(false)
-    }
+    if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl)
+    setLogoPreviewUrl(URL.createObjectURL(file))
+    pendingLogoFileRef.current = file
+    event.target.value = ''
   }
+
+  const handleRemoveLogo = () => {
+    if (logoPreviewUrl) {
+      URL.revokeObjectURL(logoPreviewUrl)
+      setLogoPreviewUrl('')
+    }
+    setLogoUrl('')
+    pendingLogoFileRef.current = null
+    setLogoError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const displayLogoUrl = logoPreviewUrl || logoUrl
+  const hasLogo = Boolean(displayLogoUrl)
 
   return (
     <form action={formAction} className="space-y-6">
@@ -194,7 +216,7 @@ export function ProjectForm({
 
           <div className="md:row-span-2 min-h-0 flex flex-col">
             <label className={labelClasses}>Project logo</label>
-            <p className="text-xs text-slate-500 mb-3">Optional · PNG, JPG or GIF · Max 2 MB</p>
+            <p className="text-xs text-slate-500 mb-3">Optional · PNG or JPG · Max 2 MB</p>
             <div
               role="button"
               tabIndex={0}
@@ -208,23 +230,23 @@ export function ProjectForm({
               className={`
                 group relative flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer
                 min-h-[120px] w-full overflow-hidden
-                ${logoUrl
+                ${hasLogo
                   ? 'border-slate-200 bg-slate-50/50 hover:border-cyan-300 hover:bg-cyan-50/30'
                   : 'border-slate-200 bg-white hover:border-[#06B6D4] hover:bg-[#06B6D4]/5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2'
                 }
-                ${isUploadingLogo ? 'pointer-events-none opacity-70' : ''}
               `}
             >
-              {logoUrl ? (
+              {hasLogo ? (
                 <>
                   <img
-                    src={logoUrl}
+                    src={displayLogoUrl}
                     alt="Project logo"
                     className="h-20 w-20 rounded-xl object-cover shadow-sm border border-slate-100"
                   />
-                  {!isUploadingLogo && (
-                    <p className="mt-3 text-sm font-medium text-slate-600">Click to change</p>
-                  )}
+                  <p className="mt-3 text-sm font-medium text-slate-600">Click to change</p>
+                  {logoPreviewUrl ? (
+                    <p className="mt-1 text-xs text-slate-500">Logo will upload when you save</p>
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -233,26 +255,11 @@ export function ProjectForm({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                     </svg>
                   </div>
-                  {!isUploadingLogo && (
-                    <p className="mt-3 text-sm font-medium text-slate-600">
-                      Click to upload or drag and drop
-                    </p>
-                  )}
+                  <p className="mt-3 text-sm font-medium text-slate-600">Click to select</p>
                 </>
               )}
-              {isUploadingLogo && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/80">
-                  <div className="flex flex-col items-center gap-2">
-                    <svg className="h-8 w-8 animate-spin text-[#06B6D4]" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    <span className="text-sm font-medium text-slate-600">Uploading...</span>
-                  </div>
-                </div>
-              )}
             </div>
-            {logoUrl && !isUploadingLogo && (
+            {hasLogo && (
               <div className="mt-2 flex items-center gap-3">
                 <button
                   type="button"
@@ -264,7 +271,7 @@ export function ProjectForm({
                 <span className="text-slate-300">·</span>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setLogoUrl('') }}
+                  onClick={(e) => { e.stopPropagation(); handleRemoveLogo() }}
                   className="text-sm font-medium text-rose-600 transition-colors duration-200 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-1 rounded-lg px-2 py-1"
                 >
                   Remove logo
@@ -282,7 +289,7 @@ export function ProjectForm({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/jpg"
               className="hidden"
               onChange={handleLogoChange}
             />
@@ -408,7 +415,7 @@ export function ProjectForm({
           </div>
           <div>
             <label htmlFor="developer_deadline_date" className={labelClasses}>
-              Developer Deadline <span className="text-rose-500">*</span>
+              Project Deadline <span className="text-rose-500">*</span>
             </label>
             <input
               type="date"
@@ -640,10 +647,10 @@ export function ProjectForm({
       <div className="flex items-center justify-end gap-3 pt-4">
         <button
           type="submit"
-          disabled={isPending || isUploadingLogo}
+          disabled={isPending}
           className="btn-gradient-smooth rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2 active:translate-y-0 active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isPending || isUploadingLogo ? 'Saving...' : submitLabel}
+          {isPending ? 'Saving...' : submitLabel}
         </button>
       </div>
     </form>

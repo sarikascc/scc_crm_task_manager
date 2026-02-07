@@ -11,6 +11,7 @@ type Project = {
   client_company_name: string | null
   status: ProjectStatus
   start_date: string
+  developer_deadline_date: string | null
   project_amount: number | null
   website_links: string | null
   created_at: string
@@ -30,6 +31,7 @@ interface ProjectsTableProps {
   projects: Project[]
   canWrite: boolean
   canViewAmount: boolean
+  showClientColumn?: boolean
   onView: (projectId: string) => void
   onEdit: (projectId: string) => void
   onDelete: (projectId: string, projectName: string) => void
@@ -127,6 +129,7 @@ export function ProjectsTable({
   projects,
   canWrite,
   canViewAmount,
+  showClientColumn = true,
   onView,
   onEdit,
   onDelete,
@@ -176,9 +179,11 @@ export function ProjectsTable({
                 <SortIcon direction={sortField === 'name' ? sortDirection : null} />
               </div>
             </th>
-            <th className="hidden sm:table-cell sm:w-[18%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Client
-            </th>
+            {showClientColumn && (
+              <th className="hidden sm:table-cell sm:w-[18%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Client
+              </th>
+            )}
             <th
               className="group w-[16%] sm:w-[12%] px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 cursor-pointer select-none hover:bg-gray-50 transition-colors"
               onClick={() => handleSort('status')}
@@ -196,6 +201,9 @@ export function ProjectsTable({
                 Start
                 <SortIcon direction={sortField === 'start_date' ? sortDirection : null} />
               </div>
+            </th>
+            <th className="hidden md:table-cell md:w-[12%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Deadline
             </th>
             {canViewAmount && (
               <th
@@ -258,11 +266,13 @@ export function ProjectsTable({
                     </div>
                   </Link>
                 </td>
-                <td className="hidden px-6 py-3 sm:table-cell">
-                  <div className="truncate text-sm text-gray-500" title={clientLabel}>
-                    {clientLabel}
-                  </div>
-                </td>
+                {showClientColumn && (
+                  <td className="hidden px-6 py-3 sm:table-cell">
+                    <div className="truncate text-sm text-gray-500" title={clientLabel}>
+                      {clientLabel}
+                    </div>
+                  </td>
+                )}
                 <td className="px-4 sm:px-6 py-3">
                   <Link href={`/dashboard/projects/${project.id}`} prefetch className="block no-underline text-inherit">
                     <StatusPill status={project.status} />
@@ -271,6 +281,11 @@ export function ProjectsTable({
                 <td className="hidden px-6 py-3 text-sm text-gray-500 md:table-cell">
                   <Link href={`/dashboard/projects/${project.id}`} prefetch className="block no-underline text-inherit">
                     {formatDate(project.start_date)}
+                  </Link>
+                </td>
+                <td className="hidden px-6 py-3 text-sm text-gray-500 md:table-cell">
+                  <Link href={`/dashboard/projects/${project.id}`} prefetch className="block no-underline text-inherit">
+                    {project.developer_deadline_date ? formatDate(project.developer_deadline_date) : '--'}
                   </Link>
                 </td>
                 {canViewAmount && (

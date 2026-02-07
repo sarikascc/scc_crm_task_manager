@@ -34,6 +34,7 @@ interface ProjectsClientProps {
   initialSortDirection: 'asc' | 'desc'
   canWrite: boolean
   canViewAmount: boolean
+  showClientColumn?: boolean
   clients: ClientSelectOption[]
   clientsError: string | null
   technologyTools: TechnologyTool[]
@@ -53,6 +54,7 @@ export function ProjectsClient({
   initialSortDirection,
   canWrite,
   canViewAmount,
+  showClientColumn = true,
   clients,
   clientsError,
   technologyTools,
@@ -313,6 +315,7 @@ export function ProjectsClient({
               projects={projects}
               canWrite={canWrite}
               canViewAmount={canViewAmount}
+              showClientColumn={showClientColumn}
               onView={handleView}
               onEdit={handleEdit}
               onDelete={handleDelete}

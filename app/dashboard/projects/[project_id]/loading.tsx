@@ -1,7 +1,26 @@
+import { Header } from '@/app/components/dashboard/header'
+import Link from 'next/link'
+
 export default function ProjectDetailLoading() {
+  const breadcrumb = (
+    <div className="flex items-center gap-2 text-sm">
+      <Link
+        href="/dashboard/projects"
+        className="font-medium text-[#06B6D4] hover:text-[#0891b2] hover:underline transition-colors"
+      >
+        Projects
+      </Link>
+      <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+      <span className="h-5 w-32 animate-pulse rounded bg-gray-200" />
+    </div>
+  )
+
   return (
-    <div className="flex h-full flex-col p-4 lg:p-6">
-      <div className="flex-1 overflow-hidden">
+    <div className="flex flex-col h-full">
+      <Header pageTitle="Project Details" breadcrumb={breadcrumb} />
+      <div className="flex-1 overflow-hidden px-4 lg:px-6 pt-2 lg:pt-3 pb-2">
         <div className="flex h-full flex-col lg:flex-row gap-4">
           <div className="w-full lg:w-1/2 flex flex-col gap-4">
             <div className="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
@@ -57,3 +76,4 @@ export default function ProjectDetailLoading() {
     </div>
   )
 }
+

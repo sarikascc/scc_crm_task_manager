@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { LeadStatus } from '@/lib/leads/actions'
 
 type FollowUpDateFilter = 'all' | 'today' | 'this_week' | 'this_month' | 'overdue' | 'no_followup'
 
-const SEARCH_DEBOUNCE_MS = 300
+const SEARCH_DEBOUNCE_MS = 500
+const MIN_SEARCH_LENGTH = 3
 
 interface LeadsFiltersProps {
   statusFilter: LeadStatus | 'all'
@@ -45,12 +46,24 @@ export function LeadsFilters({
   onClearFilters,
 }: LeadsFiltersProps) {
   const [localSearch, setLocalSearch] = useState(searchQuery)
+  const isInitialMount = useRef(true)
+
+  // Sync from URL only on mount and when search is cleared (avoids overwriting user input when navigation completes with old value)
   useEffect(() => {
-    setLocalSearch(searchQuery)
+    if (isInitialMount.current) {
+      setLocalSearch(searchQuery)
+      isInitialMount.current = false
+    } else if (searchQuery === '') {
+      setLocalSearch('')
+    }
   }, [searchQuery])
+
+  // Debounced search: fire only when 3+ chars or empty, after 500ms idle
   useEffect(() => {
     const t = setTimeout(() => {
-      if (localSearch !== searchQuery) {
+      if (localSearch === searchQuery) return
+      const shouldSearch = localSearch.length >= MIN_SEARCH_LENGTH || localSearch === ''
+      if (shouldSearch) {
         onSearchChange(localSearch)
       }
     }, SEARCH_DEBOUNCE_MS)

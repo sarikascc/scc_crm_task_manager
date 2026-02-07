@@ -226,7 +226,9 @@ export async function getLeadsPage(options: GetLeadsPageOptions = {}) {
 
   if (options.search?.trim()) {
     const term = options.search.trim()
-    query = query.or(`name.ilike.%${term}%,company_name.ilike.%${term}%`)
+    // Escape ILIKE special chars (%, _, \) so they are matched literally
+    const escaped = term.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+    query = query.or(`name.ilike.%${escaped}%,company_name.ilike.%${escaped}%`)
   }
 
   if (options.status && options.status !== 'all') {

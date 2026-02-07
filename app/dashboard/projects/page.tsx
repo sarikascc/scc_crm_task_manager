@@ -69,6 +69,7 @@ export default async function ProjectsPage({
       initialSortDirection={params.sortDir ?? 'desc'}
       canWrite={canWrite}
       canViewAmount={canViewAmount}
+      showClientColumn={user.role !== 'staff'}
       clients={clientsResult.data}
       clientsError={clientsResult.error}
       technologyTools={toolsResult.data}
