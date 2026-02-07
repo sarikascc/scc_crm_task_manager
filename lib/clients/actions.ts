@@ -31,17 +31,24 @@ export type Client = {
   updated_at: string
 }
 
-export async function createClient(formData: ClientFormData) {
+/** Result type for create/update client so callers can narrow on !result.error and use result.data */
+export type ClientActionResult =
+  | { data: Client; error: null }
+  | { data: null; error: string }
+
+export async function createClient(formData: ClientFormData): Promise<ClientActionResult> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {
     return {
       error: 'You must be logged in to create a client',
+      data: null,
     }
   }
   const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.clients, 'write')
   if (!canWrite) {
     return {
       error: 'You do not have permission to create a client',
+      data: null,
     }
   }
   if (formData.lead_id) {
@@ -49,6 +56,7 @@ export async function createClient(formData: ClientFormData) {
     if (!canWriteLeads) {
       return {
         error: 'You do not have permission to convert leads',
+        data: null,
       }
     }
   }
@@ -59,6 +67,7 @@ export async function createClient(formData: ClientFormData) {
   if (!formData.name || !formData.phone || !formData.status) {
     return {
       error: 'Name, phone, and status are required',
+      data: null,
     }
   }
 
@@ -81,6 +90,7 @@ export async function createClient(formData: ClientFormData) {
     console.error('Error creating client:', error)
     return {
       error: error.message || 'Failed to create client',
+      data: null,
     }
   }
 
@@ -88,7 +98,7 @@ export async function createClient(formData: ClientFormData) {
     const { error: followUpError } = await supabase
       .from('lead_client_followups')
       .update({
-        client_id: data.id,
+        client_id: (data as { id: string }).id,
         lead_id: null,
       })
       .eq('lead_id', formData.lead_id)
@@ -96,7 +106,7 @@ export async function createClient(formData: ClientFormData) {
 
     if (followUpError) {
       console.error('Error updating follow-ups during conversion:', followUpError)
-      return { error: followUpError.message || 'Client created, but follow-ups failed to transfer' }
+      return { error: followUpError.message || 'Client created, but follow-ups failed to transfer', data: null }
     }
 
     const { error: deleteLeadError } = await supabase
@@ -106,27 +116,29 @@ export async function createClient(formData: ClientFormData) {
 
     if (deleteLeadError) {
       console.error('Error deleting lead after conversion:', deleteLeadError)
-      return { error: deleteLeadError.message || 'Client created, but lead deletion failed' }
+      return { error: deleteLeadError.message || 'Client created, but lead deletion failed', data: null }
     }
 
     revalidatePath('/dashboard/leads')
   }
 
   revalidatePath('/dashboard/clients')
-  return { data, error: null }
+  return { data: data as unknown as Client, error: null }
 }
 
-export async function updateClient(clientId: string, formData: ClientFormData) {
+export async function updateClient(clientId: string, formData: ClientFormData): Promise<ClientActionResult> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {
     return {
       error: 'You must be logged in to update a client',
+      data: null,
     }
   }
   const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.clients, 'write')
   if (!canWrite) {
     return {
       error: 'You do not have permission to update this client',
+      data: null,
     }
   }
 
@@ -142,6 +154,7 @@ export async function updateClient(clientId: string, formData: ClientFormData) {
   if (fetchError || !existingClient) {
     return {
       error: 'Client not found',
+      data: null,
     }
   }
 
@@ -149,6 +162,7 @@ export async function updateClient(clientId: string, formData: ClientFormData) {
   if (!formData.name || !formData.phone || !formData.status) {
     return {
       error: 'Name, phone, and status are required',
+      data: null,
     }
   }
 
@@ -170,11 +184,12 @@ export async function updateClient(clientId: string, formData: ClientFormData) {
     console.error('Error updating client:', error)
     return {
       error: error.message || 'Failed to update client',
+      data: null,
     }
   }
 
   revalidatePath('/dashboard/clients')
-  return { data, error: null }
+  return { data: data as unknown as Client, error: null }
 }
 
 export async function getClient(clientId: string): Promise<{ data: Client | null; error: string | null }> {
