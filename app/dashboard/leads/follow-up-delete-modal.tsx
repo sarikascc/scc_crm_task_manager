@@ -4,7 +4,7 @@ interface FollowUpDeleteModalProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void
-  followUpDate: string
+  followUpDate: string | null
   isLoading?: boolean
 }
 
@@ -17,11 +17,13 @@ export function FollowUpDeleteModal({
 }: FollowUpDeleteModalProps) {
   if (!isOpen) return null
 
-  const formattedDate = new Date(followUpDate).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  const dateLabel = followUpDate
+    ? new Date(followUpDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'this follow-up'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -56,7 +58,7 @@ export function FollowUpDeleteModal({
             <div className="flex-1">
               <p className="text-sm text-gray-600">
                 Are you sure you want to delete the follow-up for{' '}
-                <span className="font-semibold text-[#1E1B4B]">{formattedDate}</span>? This
+                <span className="font-semibold text-[#1E1B4B]">{dateLabel}</span>? This
                 action cannot be undone.
               </p>
             </div>

@@ -82,7 +82,7 @@ export async function createClient(formData: ClientFormData): Promise<ClientActi
       remark: formData.remark || null,
       lead_id: formData.lead_id || null,
       created_by: currentUser.id,
-    })
+    } as never)
     .select()
     .single()
 
@@ -100,7 +100,7 @@ export async function createClient(formData: ClientFormData): Promise<ClientActi
       .update({
         client_id: (data as { id: string }).id,
         lead_id: null,
-      })
+      } as never)
       .eq('lead_id', formData.lead_id)
       .eq('entity_type', 'lead')
 
@@ -175,7 +175,7 @@ export async function updateClient(clientId: string, formData: ClientFormData): 
       email: formData.email || null,
       status: formData.status,
       remark: formData.remark || null,
-    })
+    } as never)
     .eq('id', clientId)
     .select()
     .single()
@@ -318,21 +318,20 @@ export async function getClientFollowUps(clientId: string) {
     return { data: [], error: null }
   }
 
-  // Fetch user names for all creators
-  const userIds = [...new Set(followUps.map((fu) => fu.created_by))]
+  type FollowUpRow = { id: string; client_id: string; note: string | null; follow_up_date: string | null; created_by: string; created_at: string; updated_at: string }
+  const followUpsList = followUps as FollowUpRow[]
+  const userIds = [...new Set(followUpsList.map((fu) => fu.created_by))]
   const { data: users } = await supabase
     .from('users')
     .select('id, full_name')
     .in('id', userIds)
 
-  // Create a map of user IDs to names
   const userMap = new Map<string, string>()
-  users?.forEach((user) => {
+  ;(users as Array<{ id: string; full_name: string | null }> | null)?.forEach((user) => {
     userMap.set(user.id, user.full_name || 'Unknown User')
   })
 
-  // Transform the data to include created_by_name
-  const transformedData = followUps.map((item) => ({
+  const transformedData = followUpsList.map((item) => ({
     id: item.id,
     client_id: item.client_id,
     note: item.note,
@@ -393,7 +392,7 @@ export async function createClientFollowUp(
       note: formData.note?.trim() || null,
       follow_up_date: formData.follow_up_date || null, // Optional reminder date
       created_by: currentUser.id,
-    })
+    } as never)
     .select()
     .single()
 
@@ -458,7 +457,7 @@ export async function updateClientFollowUp(
     .update({
       note: formData.note?.trim() || null,
       follow_up_date: formData.follow_up_date || null, // Optional reminder date
-    })
+    } as never)
     .eq('id', followUpId)
     .eq('entity_type', 'client')
     .select()
@@ -562,21 +561,20 @@ export async function getLeadFollowUpsForClient(clientId: string) {
     return { data: [], error: null }
   }
 
-  // Fetch user names for all creators
-  const userIds = [...new Set(followUps.map((fu) => fu.created_by))]
+  type LeadFollowUpRow = { id: string; client_id: string | null; note: string | null; follow_up_date: string | null; created_by: string; created_at: string; updated_at: string }
+  const followUpsList = followUps as LeadFollowUpRow[]
+  const userIds = [...new Set(followUpsList.map((fu) => fu.created_by))]
   const { data: users } = await supabase
     .from('users')
     .select('id, full_name')
     .in('id', userIds)
 
-  // Create a map of user IDs to names
   const userMap = new Map<string, string>()
-  users?.forEach((user) => {
+  ;(users as Array<{ id: string; full_name: string | null }> | null)?.forEach((user) => {
     userMap.set(user.id, user.full_name || 'Unknown User')
   })
 
-  // Transform the data to include created_by_name
-  const transformedData = followUps.map((item) => ({
+  const transformedData = followUpsList.map((item) => ({
     id: item.id,
     client_id: item.client_id,
     note: item.note,

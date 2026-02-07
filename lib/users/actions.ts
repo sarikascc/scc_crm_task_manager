@@ -191,7 +191,7 @@ export async function updateUser(id: string, formData: UpdateUserFormData) {
 
     const { error } = await supabaseAdmin
         .from('users')
-        .update(updates as any)
+        .update(updates as never)
         .eq('id', id)
 
     if (error) {
@@ -233,7 +233,7 @@ export async function deleteUser(id: string) {
         .update({
             deleted_at: new Date().toISOString(),
             is_active: false
-        } as any)
+        } as never)
         .eq('id', id)
 
     if (error) {

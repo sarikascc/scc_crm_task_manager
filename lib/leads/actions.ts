@@ -31,17 +31,24 @@ export type Lead = {
   updated_at: string
 }
 
-export async function createLead(formData: LeadFormData) {
+/** Result type for create/update lead so callers can narrow on !result.error and use result.data */
+export type LeadActionResult =
+  | { data: Lead; error: null }
+  | { data: null; error: string }
+
+export async function createLead(formData: LeadFormData): Promise<LeadActionResult> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {
     return {
       error: 'You must be logged in to create a lead',
+      data: null,
     }
   }
   const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'write')
   if (!canWrite) {
     return {
       error: 'You do not have permission to create a lead',
+      data: null,
     }
   }
 
@@ -51,6 +58,7 @@ export async function createLead(formData: LeadFormData) {
   if (!formData.name || !formData.phone || !formData.status) {
     return {
       error: 'Name, phone, and status are required',
+      data: null,
     }
   }
 
@@ -65,7 +73,7 @@ export async function createLead(formData: LeadFormData) {
       follow_up_date: formData.follow_up_date || null,
       notes: formData.notes || null,
       created_by: currentUser.id,
-    })
+    } as never)
     .select()
     .single()
 
@@ -73,11 +81,12 @@ export async function createLead(formData: LeadFormData) {
     console.error('Error creating lead:', error)
     return {
       error: error.message || 'Failed to create lead',
+      data: null,
     }
   }
 
   revalidatePath('/dashboard/leads')
-  return { data, error: null }
+  return { data: data as unknown as Lead, error: null }
 }
 
 /**
@@ -88,17 +97,19 @@ export async function createLead(formData: LeadFormData) {
  * - This does NOT create a follow-up record automatically
  * - If follow-up records exist, they will override this on next follow-up creation/update
  */
-export async function updateLead(leadId: string, formData: LeadFormData) {
+export async function updateLead(leadId: string, formData: LeadFormData): Promise<LeadActionResult> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {
     return {
       error: 'You must be logged in to update a lead',
+      data: null,
     }
   }
   const canWrite = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'write')
   if (!canWrite) {
     return {
       error: 'You do not have permission to update this lead',
+      data: null,
     }
   }
 
@@ -114,6 +125,7 @@ export async function updateLead(leadId: string, formData: LeadFormData) {
   if (fetchError || !existingLead) {
     return {
       error: 'Lead not found',
+      data: null,
     }
   }
 
@@ -121,6 +133,7 @@ export async function updateLead(leadId: string, formData: LeadFormData) {
   if (!formData.name || !formData.phone || !formData.status) {
     return {
       error: 'Name, phone, and status are required',
+      data: null,
     }
   }
 
@@ -137,7 +150,7 @@ export async function updateLead(leadId: string, formData: LeadFormData) {
       status: formData.status,
       follow_up_date: formData.follow_up_date || null, // Sets next_follow_up_date directly
       notes: formData.notes || null,
-    })
+    } as never)
     .eq('id', leadId)
     .select()
     .single()
@@ -146,11 +159,12 @@ export async function updateLead(leadId: string, formData: LeadFormData) {
     console.error('Error updating lead:', error)
     return {
       error: error.message || 'Failed to update lead',
+      data: null,
     }
   }
 
   revalidatePath('/dashboard/leads')
-  return { data, error: null }
+  return { data: data as unknown as Lead, error: null }
 }
 
 export async function getLead(leadId: string): Promise<{ data: Lead | null; error: string | null }> {
@@ -241,7 +255,17 @@ export type LeadFollowUp = {
   updated_at: string
 }
 
-export async function getLeadFollowUps(leadId: string) {
+/** Result type for getLeadFollowUps so callers can narrow on result.data */
+export type LeadFollowUpsResult =
+  | { data: LeadFollowUp[]; error: null }
+  | { data: null; error: string }
+
+/** Result type for create/update lead follow-up so callers can narrow on !result.error and use result.data */
+export type LeadFollowUpActionResult =
+  | { data: LeadFollowUp; error: null }
+  | { data: null; error: string }
+
+export async function getLeadFollowUps(leadId: string): Promise<LeadFollowUpsResult> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {
     return {
@@ -280,21 +304,20 @@ export async function getLeadFollowUps(leadId: string) {
     return { data: [], error: null }
   }
 
-  // Fetch user names for all creators
-  const userIds = [...new Set(followUps.map((fu) => fu.created_by))]
+  type FollowUpRow = { id: string; lead_id: string; note: string | null; follow_up_date: string | null; created_by: string; created_at: string; updated_at: string }
+  const followUpsList = followUps as FollowUpRow[]
+  const userIds = [...new Set(followUpsList.map((fu) => fu.created_by))]
   const { data: users } = await supabase
     .from('users')
     .select('id, full_name')
     .in('id', userIds)
 
-  // Create a map of user IDs to names
   const userMap = new Map<string, string>()
-  users?.forEach((user) => {
+  ;(users as Array<{ id: string; full_name: string | null }> | null)?.forEach((user) => {
     userMap.set(user.id, user.full_name || 'Unknown User')
   })
 
-  // Transform the data to include created_by_name
-  const transformedData = followUps.map((item) => ({
+  const transformedData = followUpsList.map((item) => ({
     id: item.id,
     lead_id: item.lead_id,
     note: item.note,
@@ -338,17 +361,15 @@ async function updateLeadFollowUpDate(leadId: string) {
     return
   }
 
-  // Convert DATE to TIMESTAMP WITH TIME ZONE for leads table
-  // Set to the latest created follow-up's date, or null if none exist
-  const latestFollowUpDate = followUps?.[0]?.follow_up_date
+  const list = followUps as Array<{ follow_up_date: string | null }> | null
+  const latestFollowUpDate = list?.[0]?.follow_up_date
   const nextFollowUpDate = latestFollowUpDate
     ? new Date(latestFollowUpDate + 'T00:00:00Z').toISOString()
     : null
 
-  // Update the lead's follow_up_date to keep it synchronized
   const { error: updateError } = await supabase
     .from('leads')
-    .update({ follow_up_date: nextFollowUpDate })
+    .update({ follow_up_date: nextFollowUpDate } as never)
     .eq('id', leadId)
 
   if (updateError) {
@@ -368,7 +389,7 @@ async function updateLeadFollowUpDate(leadId: string) {
 export async function createLeadFollowUp(
   leadId: string,
   formData: LeadFollowUpFormData
-) {
+): Promise<LeadFollowUpActionResult> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {
     return {
@@ -405,7 +426,7 @@ export async function createLeadFollowUp(
       note: formData.note?.trim() || null,
       follow_up_date: formData.follow_up_date || null, // Optional: This is the NEXT follow-up date
       created_by: currentUser.id,
-    })
+    } as never)
     .select()
     .single()
 
@@ -421,13 +442,13 @@ export async function createLeadFollowUp(
   await updateLeadFollowUpDate(leadId)
 
   revalidatePath('/dashboard/leads')
-  return { data, error: null }
+  return { data: data as unknown as LeadFollowUp, error: null }
 }
 
 export async function updateLeadFollowUp(
   followUpId: string,
   formData: LeadFollowUpFormData
-) {
+): Promise<LeadFollowUpActionResult> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {
     return {
@@ -474,7 +495,7 @@ export async function updateLeadFollowUp(
     .update({
       note: formData.note?.trim() || null,
       follow_up_date: formData.follow_up_date || null,
-    })
+    } as never)
     .eq('id', followUpId)
     .eq('entity_type', 'lead')
     .select()
@@ -489,10 +510,10 @@ export async function updateLeadFollowUp(
   }
 
   // Update lead's follow_up_date
-  await updateLeadFollowUpDate(existingFollowUp.lead_id)
+  await updateLeadFollowUpDate((existingFollowUp as { lead_id: string }).lead_id)
 
   revalidatePath('/dashboard/leads')
-  return { data, error: null }
+  return { data: data as unknown as LeadFollowUp, error: null }
 }
 
 /**
@@ -547,7 +568,7 @@ export async function deleteLeadFollowUp(followUpId: string) {
   }
 
   // Update lead.follow_up_date after deletion (latest remaining, or null)
-  await updateLeadFollowUpDate(existingFollowUp.lead_id)
+  await updateLeadFollowUpDate((existingFollowUp as { lead_id: string }).lead_id)
 
   revalidatePath('/dashboard/leads')
   return { error: null }

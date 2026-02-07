@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { canReadModule, canWriteModule } from '@/lib/permissions'
+import { canReadModule, canWriteModule, type ModulePermissions } from '@/lib/permissions'
+import type { Database } from '@/types/supabase'
+
+type UserRow = Database['public']['Tables']['users']['Row']
 
 export async function getCurrentUser() {
   const supabase = await createClient()
@@ -25,26 +28,26 @@ export async function getCurrentUser() {
 
   if (userError || !userData) {
     console.error('User consistency error:', userError)
-    // If Auth thinks we are logged in but DB disagrees (or errors), 
+    // If Auth thinks we are logged in but DB disagrees (or errors),
     // we must sign out to prevent middleware -> page -> login -> middleware redirect loop
     await supabase.auth.signOut()
     return null
   }
 
-  if (!userData.is_active) {
+  const row = userData as UserRow
+  if (!row.is_active) {
     // Inactive user - sign them out
     await supabase.auth.signOut()
     redirect('/login?error=inactive')
   }
 
   return {
-    id: userData.id,
-    email: userData.email,
-    fullName: userData.full_name,
-    role: userData.role,
-    isActive: userData.is_active,
-    // Handle case where column might be missing (migration not run)
-    modulePermissions: userData.module_permissions || {},
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name ?? undefined,
+    role: row.role,
+    isActive: row.is_active,
+    modulePermissions: (row.module_permissions as ModulePermissions | null) ?? {},
   }
 }
 

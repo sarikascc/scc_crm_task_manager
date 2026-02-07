@@ -167,7 +167,10 @@ export async function getClientInternalNotes(
     return { data: [], error: null }
   }
 
-  const noteIds = notes.map((note) => note.id)
+  type NoteRow = { id: string; client_id: string; note_text: string | null; created_by: string; created_at: string; updated_at: string }
+  type AttachmentRow = { id: string; note_id: string; client_id: string; file_name: string; mime_type: string; size_bytes: number; cloudinary_url: string; cloudinary_public_id: string; resource_type: string; created_at: string }
+  const notesList = notes as NoteRow[]
+  const noteIds = notesList.map((note) => note.id)
 
   const { data: attachments } = await supabase
     .from('client_note_attachments')
@@ -175,19 +178,19 @@ export async function getClientInternalNotes(
     .in('note_id', noteIds)
     .order('created_at', { ascending: true })
 
-  const userIds = [...new Set(notes.map((note) => note.created_by))]
+  const userIds = [...new Set(notesList.map((note) => note.created_by))]
   const { data: users } = await supabase
     .from('users')
     .select('id, full_name')
     .in('id', userIds)
 
   const userMap = new Map<string, string>()
-  users?.forEach((user) => {
+  ;(users as Array<{ id: string; full_name: string | null }> | null)?.forEach((user) => {
     userMap.set(user.id, user.full_name || 'Unknown User')
   })
 
   const attachmentsByNote = new Map<string, ClientInternalNoteAttachment[]>()
-  attachments?.forEach((attachment) => {
+  ;(attachments as AttachmentRow[] | null)?.forEach((attachment) => {
     const existing = attachmentsByNote.get(attachment.note_id) || []
     existing.push({
       id: attachment.id,
@@ -204,7 +207,7 @@ export async function getClientInternalNotes(
     attachmentsByNote.set(attachment.note_id, existing)
   })
 
-  const transformedNotes: ClientInternalNote[] = notes.map((note) => ({
+  const transformedNotes: ClientInternalNote[] = notesList.map((note) => ({
     id: note.id,
     client_id: note.client_id,
     note_text: note.note_text,
@@ -297,7 +300,7 @@ export async function createClientInternalNote(
       client_id: clientId,
       note_text: hasNote ? trimmedNote : null,
       created_by: currentUser.id,
-    })
+    } as never)
     .select()
     .single()
 
@@ -318,11 +321,12 @@ export async function createClientInternalNote(
   }
 
   if (attachments.length > 0) {
+    const noteRow = note as { id: string; client_id: string; note_text: string | null; created_by: string; created_at: string; updated_at: string }
     const { error: attachmentError } = await supabase
       .from('client_note_attachments')
       .insert(
         attachments.map((attachment) => ({
-          note_id: note.id,
+          note_id: noteRow.id,
           client_id: clientId,
           file_name: attachment.file_name,
           mime_type: attachment.mime_type,
@@ -331,12 +335,12 @@ export async function createClientInternalNote(
           cloudinary_public_id: attachment.cloudinary_public_id,
           resource_type: attachment.resource_type,
           created_by: currentUser.id,
-        }))
+        })) as never
       )
 
     if (attachmentError) {
       console.error('Error saving note attachments:', attachmentError)
-      await supabase.from('client_internal_notes').delete().eq('id', note.id)
+      await supabase.from('client_internal_notes').delete().eq('id', noteRow.id)
       await deleteCloudinaryAssets(
         attachments.map((attachment) => ({
           publicId: attachment.cloudinary_public_id,
@@ -353,15 +357,16 @@ export async function createClientInternalNote(
   revalidatePath('/dashboard/clients')
   revalidatePath(`/dashboard/clients/${clientId}`)
 
+  const noteRow = note as { id: string; client_id: string; note_text: string | null; created_by: string; created_at: string; updated_at: string }
   return {
     data: {
-      id: note.id,
-      client_id: note.client_id,
-      note_text: note.note_text,
-      created_by: note.created_by,
+      id: noteRow.id,
+      client_id: noteRow.client_id,
+      note_text: noteRow.note_text,
+      created_by: noteRow.created_by,
       created_by_name: currentUser.fullName || 'You',
-      created_at: note.created_at,
-      updated_at: note.updated_at,
+      created_at: noteRow.created_at,
+      updated_at: noteRow.updated_at,
       attachments: [],
     },
     error: null,
@@ -395,7 +400,7 @@ export async function updateClientInternalNote(
     .update({
       note_text: trimmedNote,
       updated_at: new Date().toISOString(),
-    })
+    } as never)
     .eq('id', noteId)
     .select()
     .single()
@@ -408,7 +413,10 @@ export async function updateClientInternalNote(
     }
   }
 
-  // Fetch attachments for the note
+  type NoteRow = { id: string; client_id: string; note_text: string | null; created_by: string; created_at: string; updated_at: string }
+  type AttachmentRow = { id: string; note_id: string; client_id: string; file_name: string; mime_type: string; size_bytes: number; cloudinary_url: string; cloudinary_public_id: string; resource_type: string; created_at: string }
+  const noteData = note as NoteRow
+
   const { data: attachments } = await supabase
     .from('client_note_attachments')
     .select('*')
@@ -418,18 +426,19 @@ export async function updateClientInternalNote(
   const { data: user } = await supabase
     .from('users')
     .select('full_name')
-    .eq('id', note.created_by)
+    .eq('id', noteData.created_by)
     .single()
 
+  const attachmentsList = (attachments as AttachmentRow[] | null) || []
   const transformedNote: ClientInternalNote = {
-    id: note.id,
-    client_id: note.client_id,
-    note_text: note.note_text,
-    created_by: note.created_by,
-    created_by_name: user?.full_name || 'Unknown User',
-    created_at: note.created_at,
-    updated_at: note.updated_at,
-    attachments: (attachments || []).map((attachment) => ({
+    id: noteData.id,
+    client_id: noteData.client_id,
+    note_text: noteData.note_text,
+    created_by: noteData.created_by,
+    created_by_name: (user as { full_name: string | null } | null)?.full_name || 'Unknown User',
+    created_at: noteData.created_at,
+    updated_at: noteData.updated_at,
+    attachments: attachmentsList.map((attachment) => ({
       id: attachment.id,
       note_id: attachment.note_id,
       client_id: attachment.client_id,
@@ -444,7 +453,7 @@ export async function updateClientInternalNote(
   }
 
   revalidatePath('/dashboard/clients')
-  revalidatePath(`/dashboard/clients/${note.client_id}`)
+  revalidatePath(`/dashboard/clients/${noteData.client_id}`)
 
   return { data: transformedNote, error: null }
 }
@@ -476,6 +485,7 @@ export async function deleteClientInternalNote(
     return { error: noteError?.message || 'Note not found' }
   }
 
+  const noteRow = note as { client_id: string }
   const { error: deleteError } = await supabase
     .from('client_internal_notes')
     .delete()
@@ -485,9 +495,10 @@ export async function deleteClientInternalNote(
     return { error: deleteError.message || 'Failed to delete note' }
   }
 
-  if (attachments && attachments.length > 0) {
+  const attachmentsList = attachments as Array<{ cloudinary_public_id: string; resource_type: string }> | null
+  if (attachmentsList && attachmentsList.length > 0) {
     await deleteCloudinaryAssets(
-      attachments.map((attachment) => ({
+      attachmentsList.map((attachment) => ({
         publicId: attachment.cloudinary_public_id,
         resourceType: attachment.resource_type,
       }))
@@ -495,7 +506,7 @@ export async function deleteClientInternalNote(
   }
 
   revalidatePath('/dashboard/clients')
-  revalidatePath(`/dashboard/clients/${note.client_id}`)
+  revalidatePath(`/dashboard/clients/${noteRow.client_id}`)
 
   return { error: null }
 }
@@ -512,7 +523,6 @@ export async function deleteClientNoteAttachment(
 
   const supabase = await createSupabaseClient()
 
-  // Get attachment info before deleting
   const { data: attachment, error: attachmentError } = await supabase
     .from('client_note_attachments')
     .select('cloudinary_public_id, resource_type, note_id, client_id')
@@ -523,7 +533,9 @@ export async function deleteClientNoteAttachment(
     return { error: attachmentError?.message || 'Attachment not found' }
   }
 
-  // Delete the attachment record
+  type AttachmentRow = { cloudinary_public_id: string; resource_type: string; client_id: string }
+  const att = attachment as AttachmentRow
+
   const { error: deleteError } = await supabase
     .from('client_note_attachments')
     .delete()
@@ -533,16 +545,15 @@ export async function deleteClientNoteAttachment(
     return { error: deleteError.message || 'Failed to delete attachment' }
   }
 
-  // Delete from Cloudinary
   await deleteCloudinaryAssets([
     {
-      publicId: attachment.cloudinary_public_id,
-      resourceType: attachment.resource_type,
+      publicId: att.cloudinary_public_id,
+      resourceType: att.resource_type,
     },
   ])
 
   revalidatePath('/dashboard/clients')
-  revalidatePath(`/dashboard/clients/${attachment.client_id}`)
+  revalidatePath(`/dashboard/clients/${att.client_id}`)
 
   return { error: null }
 }
