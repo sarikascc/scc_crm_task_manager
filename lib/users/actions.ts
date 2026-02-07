@@ -37,7 +37,17 @@ export type UpdateUserFormData = {
     password?: string // Optional password update
 }
 
-export async function getUsers(filters?: { search?: string; role?: string; status?: string }) {
+export type GetUsersOptions = {
+    search?: string
+    role?: string
+    status?: string
+    page?: number
+    pageSize?: number
+}
+
+const DEFAULT_PAGE_SIZE = 20
+
+export async function getUsers(filters?: GetUsersOptions) {
     const currentUser = await getCurrentUser()
 
     if (!currentUser) {
@@ -50,10 +60,12 @@ export async function getUsers(filters?: { search?: string; role?: string; statu
     }
 
     const supabase = await createClient()
+    const page = Math.max(1, filters?.page ?? 1)
+    const pageSize = Math.min(100, Math.max(1, filters?.pageSize ?? DEFAULT_PAGE_SIZE))
 
     let query = (supabase
         .from('users')
-        .select('*')
+        .select('*', { count: 'exact' })
         .is('deleted_at', null)
         .order('created_at', { ascending: false }) as any)
 
@@ -69,14 +81,16 @@ export async function getUsers(filters?: { search?: string; role?: string; statu
         query = query.eq('is_active', filters.status === 'active')
     }
 
-    const { data: users, error } = await query
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+    const { data: users, error, count } = await query.range(from, to)
 
     if (error) {
         console.error('Error fetching users:', error)
         return { error: 'Failed to fetch users' }
     }
 
-    return { data: users as UserData[] }
+    return { data: users as UserData[], totalCount: count ?? 0 }
 }
 
 export async function getUser(id: string) {

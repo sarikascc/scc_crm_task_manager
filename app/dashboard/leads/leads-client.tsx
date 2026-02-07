@@ -1,36 +1,49 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { LeadsTable } from './leads-table'
 import { LeadModal } from './lead-modal'
 import { LeadDetails } from './lead-details'
 import { DeleteConfirmModal } from './delete-confirm-modal'
 import { LeadsFilters } from './leads-filters'
-import { createLead, updateLead, getLead, deleteLead, LeadFormData, Lead, LeadStatus } from '@/lib/leads/actions'
+import { Pagination } from '@/app/components/ui/pagination'
+import { createLead, updateLead, getLead, deleteLead, LeadFormData, Lead, LeadStatus, type LeadListItem, type FollowUpDateFilter, type LeadSortField } from '@/lib/leads/actions'
 import { createClient, ClientFormData } from '@/lib/clients/actions'
 import { useToast } from '@/app/components/ui/toast-context'
 import { ClientModal } from '../clients/client-modal'
 
-type LeadListItem = {
-  id: string
-  name: string
-  company_name: string | null
-  phone: string
-  status: 'new' | 'contacted' | 'follow_up' | 'converted' | 'lost'
-  created_at: string
-  follow_up_date: string | null
-  created_by?: string
-}
+type FollowUpDateFilterType = FollowUpDateFilter
 
 interface LeadsClientProps {
   leads: LeadListItem[]
+  totalCount: number
+  page: number
+  pageSize: number
+  initialSearch: string
+  initialStatus: LeadStatus | 'all'
+  initialFollowUpDate: FollowUpDateFilterType
+  initialSortField: LeadSortField | null
+  initialSortDirection: 'asc' | 'desc'
   canWrite: boolean
   canCreateClient?: boolean
 }
 
-export function LeadsClient({ leads, canWrite, canCreateClient = false }: LeadsClientProps) {
+export function LeadsClient({
+  leads,
+  totalCount,
+  page,
+  pageSize,
+  initialSearch,
+  initialStatus,
+  initialFollowUpDate,
+  initialSortField,
+  initialSortDirection,
+  canWrite,
+  canCreateClient = false,
+}: LeadsClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { success: showSuccess, error: showError } = useToast()
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -43,132 +56,55 @@ export function LeadsClient({ leads, canWrite, canCreateClient = false }: LeadsC
   const [deleteLeadName, setDeleteLeadName] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [followUpDateFilter, setFollowUpDateFilter] = useState<'all' | 'today' | 'this_week' | 'this_month' | 'overdue' | 'no_followup'>('all')
-  const [sortField, setSortField] = useState<'name' | 'company_name' | 'phone' | 'status' | 'follow_up_date' | 'created_at' | null>(null)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-  // Helper function to check if a lead's follow-up date matches the filter
-  const matchesFollowUpDateFilter = (followUpDate: string | null): boolean => {
-    if (followUpDateFilter === 'all') return true
-    if (followUpDateFilter === 'no_followup') return !followUpDate
-
-    if (!followUpDate) return false
-
-    const followUp = new Date(followUpDate)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const followUpDateOnly = new Date(followUp)
-    followUpDateOnly.setHours(0, 0, 0, 0)
-
-    const diffTime = followUpDateOnly.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-    switch (followUpDateFilter) {
-      case 'today':
-        return diffDays === 0
-      case 'this_week':
-        return diffDays >= 0 && diffDays <= 7
-      case 'this_month':
-        return diffDays >= 0 && diffDays <= 30
-      case 'overdue':
-        return diffDays < 0
-      default:
-        return true
-    }
-  }
-
-  // Filter and sort leads
-  const filteredAndSortedLeads = useMemo(() => {
-    let result = leads.filter((lead) => {
-      // Status filter
-      if (statusFilter !== 'all' && lead.status !== statusFilter) {
-        return false
+  const buildSearchParams = useCallback(
+    (updates: {
+      search?: string
+      status?: string
+      followUp?: string
+      sort?: string | null
+      sortDir?: string
+      page?: number
+    }) => {
+      const params = new URLSearchParams()
+      const search = updates.search !== undefined ? updates.search : initialSearch
+      const status = updates.status !== undefined ? updates.status : initialStatus
+      const followUp = updates.followUp !== undefined ? updates.followUp : initialFollowUpDate
+      const sort = updates.sort !== undefined ? updates.sort : initialSortField
+      const sortDir = updates.sortDir !== undefined ? updates.sortDir : initialSortDirection
+      const pageNum = updates.page !== undefined ? updates.page : page
+      if (search) params.set('search', search)
+      if (status && status !== 'all') params.set('status', status)
+      if (followUp && followUp !== 'all') params.set('followUp', followUp)
+      if (sort) {
+        params.set('sort', sort)
+        params.set('sortDir', sortDir)
       }
+      if (pageNum > 1) params.set('page', String(pageNum))
+      return params.toString()
+    },
+    [initialSearch, initialStatus, initialFollowUpDate, initialSortField, initialSortDirection, page]
+  )
 
-      // Search filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase()
-        const matchesName = lead.name.toLowerCase().includes(query)
-        const matchesCompany = lead.company_name?.toLowerCase().includes(query) || false
-        if (!matchesName && !matchesCompany) {
-          return false
-        }
-      }
-
-      // Follow-up date filter
-      if (!matchesFollowUpDateFilter(lead.follow_up_date)) {
-        return false
-      }
-
-      return true
-    })
-
-    // Apply sorting
-    if (sortField) {
-      result = [...result].sort((a, b) => {
-        let aValue: any
-        let bValue: any
-
-        switch (sortField) {
-          case 'name':
-            aValue = a.name.toLowerCase()
-            bValue = b.name.toLowerCase()
-            break
-          case 'company_name':
-            aValue = (a.company_name || '').toLowerCase()
-            bValue = (b.company_name || '').toLowerCase()
-            break
-          case 'phone':
-            aValue = a.phone
-            bValue = b.phone
-            break
-          case 'status':
-            aValue = a.status
-            bValue = b.status
-            break
-          case 'follow_up_date':
-            aValue = a.follow_up_date ? new Date(a.follow_up_date).getTime() : 0
-            bValue = b.follow_up_date ? new Date(b.follow_up_date).getTime() : 0
-            break
-          case 'created_at':
-            aValue = new Date(a.created_at).getTime()
-            bValue = new Date(b.created_at).getTime()
-            break
-          default:
-            return 0
-        }
-
-        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
-        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
-        return 0
-      })
-    }
-
-    return result
-  }, [leads, statusFilter, searchQuery, followUpDateFilter, sortField, sortDirection])
-
-  const handleSort = (field: 'name' | 'company_name' | 'phone' | 'status' | 'follow_up_date' | 'created_at' | null) => {
+  const handleSort = (field: LeadSortField | null) => {
     if (!field) {
-      setSortField(null)
-      setSortDirection('asc')
+      router.push(`${pathname}?${buildSearchParams({ sort: null, sortDir: undefined, page: 1 })}`)
       return
     }
-
-    if (sortField === field) {
-      // Toggle direction: asc -> desc -> null
-      if (sortDirection === 'asc') {
-        setSortDirection('desc')
-      } else {
-        setSortField(null)
-        setSortDirection('asc')
-      }
-    } else {
-      setSortField(field)
-      setSortDirection('asc')
-    }
+    const nextDir =
+      initialSortField === field
+        ? initialSortDirection === 'asc'
+          ? 'desc'
+          : 'asc'
+        : 'asc'
+    const nextSort = initialSortField === field && initialSortDirection === 'desc' ? null : field
+    router.push(
+      `${pathname}?${buildSearchParams({
+        sort: nextSort ?? undefined,
+        sortDir: nextSort ? nextDir : undefined,
+        page: 1,
+      })}`
+    )
   }
 
   const handleCreate = async (formData: LeadFormData) => {
@@ -315,10 +251,25 @@ export function LeadsClient({ leads, canWrite, canCreateClient = false }: LeadsC
     }
   }
 
+  const handleFilterChange = (updates: { search?: string; status?: LeadStatus | 'all'; followUp?: FollowUpDateFilterType }) => {
+    const q = buildSearchParams({
+      ...updates,
+      page: 1,
+    })
+    router.push(`${pathname}${q ? `?${q}` : ''}`)
+  }
+
   const handleClearFilters = () => {
-    setStatusFilter('all')
-    setSearchQuery('')
-    setFollowUpDateFilter('all')
+    router.push(pathname)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    const q = buildSearchParams({ page: newPage })
+    router.push(`${pathname}${q ? `?${q}` : ''}`)
+  }
+
+  const handleRefresh = () => {
+    router.refresh()
   }
 
   const handleConvert = async (leadId: string) => {
@@ -374,29 +325,40 @@ export function LeadsClient({ leads, canWrite, canCreateClient = false }: LeadsC
   return (
     <>
       <div className="flex h-full flex-col p-4 lg:p-6">
-        {/* Page Title and Create Lead Button */}
+        {/* Page Title, Refresh, and Create Lead Button */}
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-[#1E1B4B]">Leads</h1>
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            disabled={!canWrite}
-            title={canWrite ? 'Create lead' : 'Read-only access'}
-            className={`btn-gradient-smooth rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2 active:translate-y-0 active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${!canWrite ? 'hover:shadow-lg hover:-translate-y-0' : ''}`}
-          >
-            Create Lead
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              title="Refresh"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              disabled={!canWrite}
+              title={canWrite ? 'Create lead' : 'Read-only access'}
+              className={`btn-gradient-smooth rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2 active:translate-y-0 active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${!canWrite ? 'hover:shadow-lg hover:-translate-y-0' : ''}`}
+            >
+              Create Lead
+            </button>
+          </div>
         </div>
 
         {/* Full Height Table Container */}
         <div className="flex-1 overflow-hidden rounded-lg bg-white shadow-sm flex flex-col">
-          {/* Filters */}
           <LeadsFilters
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            followUpDateFilter={followUpDateFilter}
-            onFollowUpDateChange={setFollowUpDateFilter}
+            statusFilter={initialStatus}
+            onStatusChange={(s) => handleFilterChange({ status: s })}
+            searchQuery={initialSearch}
+            onSearchChange={(q) => handleFilterChange({ search: q })}
+            followUpDateFilter={initialFollowUpDate}
+            onFollowUpDateChange={(f) => handleFilterChange({ followUp: f })}
             onClearFilters={handleClearFilters}
           />
 
@@ -407,19 +369,25 @@ export function LeadsClient({ leads, canWrite, canCreateClient = false }: LeadsC
           )}
           <div className="flex-1 overflow-y-auto">
             <LeadsTable
-              leads={filteredAndSortedLeads}
+              leads={leads}
               canWrite={canWrite}
               onView={handleView}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onConvert={handleConvert}
               canConvert={canConvert}
-              sortField={sortField}
-              sortDirection={sortField ? sortDirection : undefined}
+              sortField={initialSortField}
+              sortDirection={initialSortField ? initialSortDirection : undefined}
               onSort={handleSort}
-              isFiltered={statusFilter !== 'all' || searchQuery.trim() !== '' || followUpDateFilter !== 'all'}
+              isFiltered={initialStatus !== 'all' || initialSearch.trim() !== '' || initialFollowUpDate !== 'all'}
             />
           </div>
+          <Pagination
+            currentPage={page}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+          />
         </div>
       </div>
 

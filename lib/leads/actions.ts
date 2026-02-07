@@ -167,6 +167,121 @@ export async function updateLead(leadId: string, formData: LeadFormData): Promis
   return { data: data as unknown as Lead, error: null }
 }
 
+export type FollowUpDateFilter =
+  | 'all'
+  | 'today'
+  | 'this_week'
+  | 'this_month'
+  | 'overdue'
+  | 'no_followup'
+
+export type LeadSortField =
+  | 'name'
+  | 'company_name'
+  | 'phone'
+  | 'status'
+  | 'follow_up_date'
+  | 'created_at'
+
+export type GetLeadsPageOptions = {
+  search?: string
+  status?: LeadStatus | 'all'
+  followUpDate?: FollowUpDateFilter
+  sortField?: LeadSortField
+  sortDirection?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+}
+
+export type LeadListItem = {
+  id: string
+  name: string
+  company_name: string | null
+  phone: string
+  status: LeadStatus
+  created_at: string
+  follow_up_date: string | null
+  created_by?: string
+}
+
+export async function getLeadsPage(options: GetLeadsPageOptions = {}) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    return { data: [], totalCount: 0, error: 'You must be logged in to view leads' }
+  }
+  const canRead = await hasPermission(currentUser, MODULE_PERMISSION_IDS.leads, 'read')
+  if (!canRead) {
+    return { data: [], totalCount: 0, error: 'You do not have permission to view leads' }
+  }
+
+  const page = Math.max(1, options.page ?? 1)
+  const pageSize = Math.min(100, Math.max(1, options.pageSize ?? 20))
+  const supabase = await createClient()
+
+  let query = supabase
+    .from('leads')
+    .select('id, name, company_name, phone, status, created_at, follow_up_date, created_by', {
+      count: 'exact',
+    })
+
+  if (options.search?.trim()) {
+    const term = options.search.trim()
+    query = query.or(`name.ilike.%${term}%,company_name.ilike.%${term}%`)
+  }
+
+  if (options.status && options.status !== 'all') {
+    query = query.eq('status', options.status)
+  }
+
+  if (options.followUpDate && options.followUpDate !== 'all') {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    const todayStart = now.toISOString().split('T')[0]
+    const todayEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const monthEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+    switch (options.followUpDate) {
+      case 'no_followup':
+        query = query.is('follow_up_date', null)
+        break
+      case 'today':
+        query = query.gte('follow_up_date', todayStart).lt('follow_up_date', todayEnd)
+        break
+      case 'this_week':
+        query = query.gte('follow_up_date', todayStart).lte('follow_up_date', weekEnd)
+        break
+      case 'this_month':
+        query = query.gte('follow_up_date', todayStart).lte('follow_up_date', monthEnd)
+        break
+      case 'overdue':
+        query = query.lt('follow_up_date', todayStart).not('follow_up_date', 'is', null)
+        break
+      default:
+        break
+    }
+  }
+
+  const sortField = options.sortField ?? 'created_at'
+  const sortDirection = options.sortDirection ?? 'desc'
+  query = query.order(sortField, { ascending: sortDirection === 'asc' })
+
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+  const { data, error, count } = await query.range(from, to)
+
+  if (error) {
+    console.error('Error fetching leads:', error)
+    return { data: [], totalCount: 0, error: error.message || 'Failed to fetch leads' }
+  }
+
+  return {
+    data: (data || []) as LeadListItem[],
+    totalCount: count ?? 0,
+    error: null,
+  }
+}
+
 export async function getLead(leadId: string): Promise<{ data: Lead | null; error: string | null }> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {

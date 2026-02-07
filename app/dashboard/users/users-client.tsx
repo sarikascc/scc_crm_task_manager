@@ -7,23 +7,26 @@ import { UsersTable } from '@/app/components/users/users-table'
 import { UserModal } from '@/app/components/users/user-modal'
 import { ChangePasswordModal } from '@/app/components/users/change-password-modal'
 import { UserDeleteModal } from '@/app/components/users/user-delete-modal'
+import { Pagination } from '@/app/components/ui/pagination'
 import { UserData, UserRole, createUser, updateUser, deleteUser } from '@/lib/users/actions'
 import { useToast } from '@/app/components/ui/toast-context'
 
 interface UsersClientProps {
     initialUsers: UserData[]
+    totalCount: number
+    page: number
+    pageSize: number
     currentUserId: string
     canWrite: boolean
 }
 
-export default function UsersClient({ initialUsers, currentUserId, canWrite }: UsersClientProps) {
+export default function UsersClient({ initialUsers, totalCount, page, pageSize, currentUserId, canWrite }: UsersClientProps) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const [isPending, startTransition] = useTransition()
     const { success: showSuccess, error: showError } = useToast()
 
-    // Current filter values from URL
     const currentSearch = searchParams.get('search') || ''
     const currentRole = (searchParams.get('role') as UserRole) || 'all'
 
@@ -41,7 +44,6 @@ export default function UsersClient({ initialUsers, currentUserId, canWrite }: U
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
     const [userToDelete, setUserToDelete] = useState<UserData | undefined>(undefined)
 
-    // Helper to update filters
     const updateFilters = (updates: Record<string, string | null>) => {
         const params = new URLSearchParams(searchParams.toString())
         Object.entries(updates).forEach(([key, value]) => {
@@ -51,10 +53,23 @@ export default function UsersClient({ initialUsers, currentUserId, canWrite }: U
                 params.set(key, value)
             }
         })
-
+        params.delete('page')
         startTransition(() => {
             router.push(`${pathname}?${params.toString()}`)
         })
+    }
+
+    const handlePageChange = (newPage: number) => {
+        const params = new URLSearchParams(searchParams.toString())
+        if (newPage <= 1) params.delete('page')
+        else params.set('page', String(newPage))
+        startTransition(() => {
+            router.push(`${pathname}?${params.toString()}`)
+        })
+    }
+
+    const handleRefresh = () => {
+        router.refresh()
     }
 
     // Handlers
@@ -141,29 +156,39 @@ export default function UsersClient({ initialUsers, currentUserId, canWrite }: U
 
     return (
         <div className="flex h-full flex-col p-4 lg:p-6">
-            {/* Page Title and Create Button */}
             <div className="mb-4 flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-slate-900 font-display">User Management</h1>
-                <button
-                    onClick={handleCreateOpen}
-                    disabled={!canWrite}
-                    title={canWrite ? 'Add user' : 'Read-only access'}
-                    className={`flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#0891b2] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 active:translate-y-0 ${!canWrite ? 'opacity-50 cursor-not-allowed hover:shadow-lg hover:-translate-y-0' : ''}`}
-                >
-                    <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={handleRefresh}
+                        title="Refresh"
+                        className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
                     >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Add User
-                </button>
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={handleCreateOpen}
+                        disabled={!canWrite}
+                        title={canWrite ? 'Add user' : 'Read-only access'}
+                        className={`flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#0891b2] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 active:translate-y-0 ${!canWrite ? 'opacity-50 cursor-not-allowed hover:shadow-lg hover:-translate-y-0' : ''}`}
+                    >
+                        <svg
+                            className="h-5 w-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add User
+                    </button>
+                </div>
             </div>
 
-            {/* Main Content Card */}
             <div className={`flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 flex flex-col transition-opacity duration-200 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
                 <UsersFilters
                     roleFilter={currentRole}
@@ -183,6 +208,12 @@ export default function UsersClient({ initialUsers, currentUserId, canWrite }: U
                         onDelete={handleDeleteOpen}
                     />
                 </div>
+                <Pagination
+                    currentPage={page}
+                    totalCount={totalCount}
+                    pageSize={pageSize}
+                    onPageChange={handlePageChange}
+                />
             </div>
 
             {/* Modal */}

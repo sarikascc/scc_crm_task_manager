@@ -1,34 +1,43 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { ClientsTable } from './clients-table'
 import { ClientModal } from './client-modal'
 import { DeleteConfirmModal } from './delete-confirm-modal'
 import { ClientsFilters } from './clients-filters'
 import { InternalNotesPanel } from './internal-notes-panel'
-import { createClient, updateClient, getClient, deleteClient, ClientFormData, Client, ClientStatus } from '@/lib/clients/actions'
+import { Pagination } from '@/app/components/ui/pagination'
+import { createClient, updateClient, getClient, deleteClient, ClientFormData, Client, ClientStatus, type ClientListItem, type ClientSortField } from '@/lib/clients/actions'
 import { useToast } from '@/app/components/ui/toast-context'
-
-type ClientListItem = {
-  id: string
-  name: string
-  company_name: string | null
-  phone: string
-  email: string | null
-  status: 'active' | 'inactive'
-  created_at: string
-  created_by?: string
-}
 
 interface ClientsClientProps {
   clients: ClientListItem[]
+  totalCount: number
+  page: number
+  pageSize: number
+  initialSearch: string
+  initialStatus: ClientStatus | 'all'
+  initialSortField: ClientSortField | null
+  initialSortDirection: 'asc' | 'desc'
   canWrite: boolean
   canManageInternalNotes: boolean
 }
 
-export function ClientsClient({ clients, canWrite, canManageInternalNotes }: ClientsClientProps) {
+export function ClientsClient({
+  clients,
+  totalCount,
+  page,
+  pageSize,
+  initialSearch,
+  initialStatus,
+  initialSortField,
+  initialSortDirection,
+  canWrite,
+  canManageInternalNotes,
+}: ClientsClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { success: showSuccess, error: showError } = useToast()
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -38,94 +47,55 @@ export function ClientsClient({ clients, canWrite, canManageInternalNotes }: Cli
   const [deleteClientName, setDeleteClientName] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<ClientStatus | 'all'>('all')
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [sortField, setSortField] = useState<'name' | 'company_name' | 'phone' | 'status' | 'created_at' | null>(null)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [internalNotesOpen, setInternalNotesOpen] = useState(false)
   const [internalNotesClientId, setInternalNotesClientId] = useState<string | null>(null)
   const [internalNotesClientName, setInternalNotesClientName] = useState<string>('')
 
-  // Filter and sort clients
-  const filteredAndSortedClients = useMemo(() => {
-    let result = clients.filter((client) => {
-      // Status filter
-      if (statusFilter !== 'all' && client.status !== statusFilter) {
-        return false
+  const buildSearchParams = useCallback(
+    (updates: {
+      search?: string
+      status?: string
+      sort?: string | null
+      sortDir?: string
+      page?: number
+    }) => {
+      const params = new URLSearchParams()
+      const search = updates.search !== undefined ? updates.search : initialSearch
+      const status = updates.status !== undefined ? updates.status : initialStatus
+      const sort = updates.sort !== undefined ? updates.sort : initialSortField
+      const sortDir = updates.sortDir !== undefined ? updates.sortDir : initialSortDirection
+      const pageNum = updates.page !== undefined ? updates.page : page
+      if (search) params.set('search', search)
+      if (status && status !== 'all') params.set('status', status)
+      if (sort) {
+        params.set('sort', sort)
+        params.set('sortDir', sortDir)
       }
+      if (pageNum > 1) params.set('page', String(pageNum))
+      return params.toString()
+    },
+    [initialSearch, initialStatus, initialSortField, initialSortDirection, page]
+  )
 
-      // Search filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase()
-        const matchesName = client.name.toLowerCase().includes(query)
-        const matchesCompany = client.company_name?.toLowerCase().includes(query) || false
-        if (!matchesName && !matchesCompany) {
-          return false
-        }
-      }
-
-      return true
-    })
-
-    // Apply sorting
-    if (sortField) {
-      result = [...result].sort((a, b) => {
-        let aValue: any
-        let bValue: any
-
-        switch (sortField) {
-          case 'name':
-            aValue = a.name.toLowerCase()
-            bValue = b.name.toLowerCase()
-            break
-          case 'company_name':
-            aValue = (a.company_name || '').toLowerCase()
-            bValue = (b.company_name || '').toLowerCase()
-            break
-          case 'phone':
-            aValue = a.phone
-            bValue = b.phone
-            break
-          case 'status':
-            aValue = a.status
-            bValue = b.status
-            break
-          case 'created_at':
-            aValue = new Date(a.created_at).getTime()
-            bValue = new Date(b.created_at).getTime()
-            break
-          default:
-            return 0
-        }
-
-        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
-        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
-        return 0
-      })
-    }
-
-    return result
-  }, [clients, statusFilter, searchQuery, sortField, sortDirection])
-
-  const handleSort = (field: 'name' | 'company_name' | 'phone' | 'status' | 'created_at' | null) => {
+  const handleSort = (field: ClientSortField | null) => {
     if (!field) {
-      setSortField(null)
-      setSortDirection('asc')
+      router.push(`${pathname}?${buildSearchParams({ sort: null, sortDir: undefined, page: 1 })}`)
       return
     }
-
-    if (sortField === field) {
-      // Toggle direction: asc -> desc -> null
-      if (sortDirection === 'asc') {
-        setSortDirection('desc')
-      } else {
-        setSortField(null)
-        setSortDirection('asc')
-      }
-    } else {
-      setSortField(field)
-      setSortDirection('asc')
-    }
+    const nextDir =
+      initialSortField === field
+        ? initialSortDirection === 'asc'
+          ? 'desc'
+          : 'asc'
+        : 'asc'
+    const nextSort = initialSortField === field && initialSortDirection === 'desc' ? null : field
+    router.push(
+      `${pathname}?${buildSearchParams({
+        sort: nextSort ?? undefined,
+        sortDir: nextSort ? nextDir : undefined,
+        page: 1,
+      })}`
+    )
   }
 
   const handleCreate = async (formData: ClientFormData) => {
@@ -235,9 +205,22 @@ export function ClientsClient({ clients, canWrite, canManageInternalNotes }: Cli
     }
   }
 
+  const handleFilterChange = (updates: { search?: string; status?: ClientStatus | 'all' }) => {
+    const q = buildSearchParams({ ...updates, page: 1 })
+    router.push(`${pathname}${q ? `?${q}` : ''}`)
+  }
+
   const handleClearFilters = () => {
-    setStatusFilter('all')
-    setSearchQuery('')
+    router.push(pathname)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    const q = buildSearchParams({ page: newPage })
+    router.push(`${pathname}${q ? `?${q}` : ''}`)
+  }
+
+  const handleRefresh = () => {
+    router.refresh()
   }
 
   const handleOpenInternalNotes = (clientId: string, clientName: string) => {
@@ -253,27 +236,36 @@ export function ClientsClient({ clients, canWrite, canManageInternalNotes }: Cli
   return (
     <>
       <div className="flex h-full flex-col p-4 lg:p-6">
-        {/* Page Title and Create Client Button */}
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-[#1E1B4B]">Clients</h1>
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            disabled={!canWrite}
-            title={canWrite ? 'Create client' : 'Read-only access'}
-            className={`btn-gradient-smooth rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2 active:translate-y-0 active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${!canWrite ? 'hover:shadow-lg hover:-translate-y-0' : ''}`}
-          >
-            Create Client
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              title="Refresh"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              disabled={!canWrite}
+              title={canWrite ? 'Create client' : 'Read-only access'}
+              className={`btn-gradient-smooth rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#06B6D4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#06B6D4]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2 active:translate-y-0 active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${!canWrite ? 'hover:shadow-lg hover:-translate-y-0' : ''}`}
+            >
+              Create Client
+            </button>
+          </div>
         </div>
 
-        {/* Full Height Table Container */}
         <div className="flex-1 overflow-hidden rounded-lg bg-white shadow-sm flex flex-col">
-          {/* Filters */}
           <ClientsFilters
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            statusFilter={initialStatus}
+            onStatusChange={(s) => handleFilterChange({ status: s })}
+            searchQuery={initialSearch}
+            onSearchChange={(q) => handleFilterChange({ search: q })}
             onClearFilters={handleClearFilters}
           />
 
@@ -284,19 +276,25 @@ export function ClientsClient({ clients, canWrite, canManageInternalNotes }: Cli
           )}
           <div className="flex-1 overflow-y-auto">
             <ClientsTable
-              clients={filteredAndSortedClients}
+              clients={clients}
               canWrite={canWrite}
               canManageInternalNotes={canManageInternalNotes}
               onView={handleView}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onOpenInternalNotes={handleOpenInternalNotes}
-              sortField={sortField}
-              sortDirection={sortField ? sortDirection : undefined}
+              sortField={initialSortField}
+              sortDirection={initialSortField ? initialSortDirection : undefined}
               onSort={handleSort}
-              isFiltered={statusFilter !== 'all' || searchQuery.trim() !== ''}
+              isFiltered={initialStatus !== 'all' || initialSearch.trim() !== ''}
             />
           </div>
+          <Pagination
+            currentPage={page}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+          />
         </div>
       </div>
 

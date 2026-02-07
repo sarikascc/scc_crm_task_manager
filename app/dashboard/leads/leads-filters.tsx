@@ -1,8 +1,11 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { LeadStatus } from '@/lib/leads/actions'
 
 type FollowUpDateFilter = 'all' | 'today' | 'this_week' | 'this_month' | 'overdue' | 'no_followup'
+
+const SEARCH_DEBOUNCE_MS = 300
 
 interface LeadsFiltersProps {
   statusFilter: LeadStatus | 'all'
@@ -41,6 +44,19 @@ export function LeadsFilters({
   onFollowUpDateChange,
   onClearFilters,
 }: LeadsFiltersProps) {
+  const [localSearch, setLocalSearch] = useState(searchQuery)
+  useEffect(() => {
+    setLocalSearch(searchQuery)
+  }, [searchQuery])
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (localSearch !== searchQuery) {
+        onSearchChange(localSearch)
+      }
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [localSearch, onSearchChange, searchQuery])
+
   const hasActiveFilters =
     statusFilter !== 'all' || searchQuery.trim() !== '' || followUpDateFilter !== 'all'
 
@@ -69,8 +85,8 @@ export function LeadsFilters({
               </div>
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 placeholder="Search by name or company..."
                 className="block w-full rounded-lg border border-gray-200 bg-white pl-10 pr-4 py-2 text-sm text-[#1E1B4B] placeholder-gray-400 shadow-sm transition-all duration-200 focus:border-[#06B6D4] focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-opacity-20"
               />

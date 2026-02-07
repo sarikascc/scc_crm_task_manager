@@ -31,6 +31,77 @@ export type Client = {
   updated_at: string
 }
 
+export type ClientSortField = 'name' | 'company_name' | 'phone' | 'status' | 'created_at'
+
+export type GetClientsPageOptions = {
+  search?: string
+  status?: ClientStatus | 'all'
+  sortField?: ClientSortField
+  sortDirection?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+}
+
+export type ClientListItem = {
+  id: string
+  name: string
+  company_name: string | null
+  phone: string
+  email: string | null
+  status: ClientStatus
+  created_at: string
+  created_by?: string
+}
+
+export async function getClientsPage(options: GetClientsPageOptions = {}) {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    return { data: [], totalCount: 0, error: 'You must be logged in to view clients' }
+  }
+  const canRead = await hasPermission(currentUser, MODULE_PERMISSION_IDS.clients, 'read')
+  if (!canRead) {
+    return { data: [], totalCount: 0, error: 'You do not have permission to view clients' }
+  }
+
+  const page = Math.max(1, options.page ?? 1)
+  const pageSize = Math.min(100, Math.max(1, options.pageSize ?? 20))
+  const supabase = await createSupabaseClient()
+
+  let query = supabase
+    .from('clients')
+    .select('id, name, company_name, phone, email, status, created_at, created_by', {
+      count: 'exact',
+    })
+
+  if (options.search?.trim()) {
+    const term = options.search.trim()
+    query = query.or(`name.ilike.%${term}%,company_name.ilike.%${term}%`)
+  }
+
+  if (options.status && options.status !== 'all') {
+    query = query.eq('status', options.status)
+  }
+
+  const sortField = options.sortField ?? 'created_at'
+  const sortDirection = options.sortDirection ?? 'desc'
+  query = query.order(sortField, { ascending: sortDirection === 'asc' })
+
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+  const { data, error, count } = await query.range(from, to)
+
+  if (error) {
+    console.error('Error fetching clients:', error)
+    return { data: [], totalCount: 0, error: error.message || 'Failed to fetch clients' }
+  }
+
+  return {
+    data: (data || []) as ClientListItem[],
+    totalCount: count ?? 0,
+    error: null,
+  }
+}
+
 /** Result type for create/update client so callers can narrow on !result.error and use result.data */
 export type ClientActionResult =
   | { data: Client; error: null }
